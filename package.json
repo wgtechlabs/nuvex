@@ -1,15 +1,16 @@
 {
   "name": "nuvex",
-  "version": "1.0.0",
+  "version": "1.0.0-beta",
   "description": "Next-gen Unified Vault Experience - A minimalist SDK for structured memory layering in Redis and PostgreSQL",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/types/index.d.ts"
     }
   },
   "files": [
@@ -22,19 +23,24 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
-    "clean": "rimraf dist",
+    "build:docs": "typedoc src/index.ts --out docs --excludePrivate --readme README.md",
+    "clean": "rimraf dist docs",
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "prepublishOnly": "npm run build"
+    "docs": "npm run build:docs && echo 'Documentation generated in ./docs/'",
+    "validate": "yarn lint && yarn test && yarn build",
+    "validate:full": "yarn install && yarn lint && yarn test:coverage && yarn build && yarn docs",
+    "prepublishOnly": "yarn validate"
   },
   "keywords": [
     "storage",
     "cache",
     "redis",
-    "postgresql", 
+    "postgresql",
     "memory",
     "multi-layer",
     "vault",
@@ -52,20 +58,28 @@
     "url": "https://github.com/wgtechlabs/nuvex/issues"
   },
   "homepage": "https://github.com/wgtechlabs/nuvex#readme",
+  "packageManager": "yarn@4.2.2",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.0.0",
+    "yarn": ">=1.22.0"
   },
   "dependencies": {
+    "global": "^4.4.0",
+    "pg": "^8.11.0",
     "redis": "^4.6.0",
-    "pg": "^8.11.0"
-  },  "devDependencies": {
+    "snyk": "^1.1297.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.45.0",
+    "@typescript-eslint/eslint-plugin": "^8.34.1",
+    "@typescript-eslint/parser": "^8.34.1",
+    "eslint": "^9.29.0",
     "jest": "^29.6.0",
     "rimraf": "^5.0.0",
+    "ts-jest": "^29.4.0",
+    "typedoc": "^0.25.13",
     "typescript": "^5.1.0"
   }
 }

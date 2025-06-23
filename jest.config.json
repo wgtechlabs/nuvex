@@ -1,0 +1,39 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>/src"],
+  "testMatch": [
+    "<rootDir>/src/**/__tests__/**/*.test.ts",
+    "<rootDir>/src/**/__tests__/**/*.spec.ts"
+  ],
+  "transform": {
+    "^.+\\.ts$": ["ts-jest", {
+      "useESM": true
+    }]
+  },
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/**/__tests__/**",
+    "!src/**/*.d.ts",
+    "!src/index.ts"
+  ],
+  "coverageDirectory": "coverage",  "coverageReporters": [
+    "text",
+    "lcov",
+    "html"
+  ],  "coverageThreshold": {
+    "global": {
+      "branches": 69,
+      "functions": 75,
+      "lines": 75,
+      "statements": 75
+    }
+  },
+  "setupFilesAfterEnv": ["<rootDir>/src/__tests__/setup.ts"],
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
+  "extensionsToTreatAsEsm": [".ts"],
+  "testTimeout": 10000
+}
