@@ -58,14 +58,13 @@
  * // Get data (automatically checks Memory → Redis → PostgreSQL)
  * const user = await client.get('user:123');
  * ```
- * 
- * ## Use Cases
+ *  * ## Use Cases
  * 
  * - **Session Management**: Store user sessions with automatic expiration
  * - **API Caching**: Cache API responses with intelligent invalidation
  * - **Configuration Storage**: Store application settings with fallback
  * - **Real-time Data**: Handle high-frequency data with performance optimization
- * - **Bot Applications**: Store conversation state and user preferences
+ * - **Application State**: Store application state and user preferences
  * - **Microservices**: Shared data layer across distributed services
  * 
  * @author Waren Gonzaga, WG Technology Labs
