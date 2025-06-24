@@ -87,17 +87,15 @@ export interface Storage {
   disconnect(): Promise<void>;
   /** Check if the storage engine is connected and ready */
   isConnected(): boolean;
-
   // Basic operations
-  
   /** Store a value with optional configuration */
   set<T = unknown>(key: string, value: T, options?: StorageOptions): Promise<boolean>;
   /** Retrieve a value from storage */
-  get<T = unknown>(key: string, options?: StorageOptions): Promise<T | null>;
+  get<T = unknown>(key: string, options: StorageOptions): Promise<T | null>;
   /** Delete a value from all storage layers */
-  delete(key: string, options?: StorageOptions): Promise<boolean>;
+  delete(key: string, options: StorageOptions): Promise<boolean>;
   /** Check if a key exists in any storage layer */
-  exists(key: string, options?: StorageOptions): Promise<boolean>;
+  exists(key: string, options: StorageOptions): Promise<boolean>;
   /** Set or update expiration time for a key */
   expire(key: string, ttl: number): Promise<boolean>;
 
@@ -106,7 +104,7 @@ export interface Storage {
   /** Execute multiple storage operations in a batch */
   setBatch(operations: BatchOperation[]): Promise<BatchResult[]>;
   /** Retrieve multiple values in a batch */
-  getBatch(keys: string[], options?: StorageOptions): Promise<BatchResult[]>;
+  getBatch(keys: string[], options: StorageOptions): Promise<BatchResult[]>;
   /** Delete multiple values in a batch */
   deleteBatch(keys: string[]): Promise<BatchResult[]>;
 

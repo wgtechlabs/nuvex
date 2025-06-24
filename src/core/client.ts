@@ -261,7 +261,7 @@ export class NuvexClient implements IStore {
    * 
    * @since 1.0.0
    */
-  async get<T = unknown>(key: string, options?: StorageOptions): Promise<T | null> {
+  async get<T = unknown>(key: string, options: StorageOptions = {}): Promise<T | null> {
     return this.storage.get<T>(key, options);
   }
   
@@ -285,7 +285,7 @@ export class NuvexClient implements IStore {
    * 
    * @since 1.0.0
    */
-  async delete(key: string, options?: StorageOptions): Promise<boolean> {
+  async delete(key: string, options: StorageOptions = {}): Promise<boolean> {
     return this.storage.delete(key, options);
   }
   
@@ -305,7 +305,7 @@ export class NuvexClient implements IStore {
    * 
    * @since 1.0.0
    */
-  async exists(key: string, options?: StorageOptions): Promise<boolean> {
+  async exists(key: string, options: StorageOptions = {}): Promise<boolean> {
     return this.storage.exists(key, options);
   }
   
@@ -377,7 +377,7 @@ export class NuvexClient implements IStore {
    * 
    * @since 1.0.0
    */
-  async getBatch(keys: string[], options?: StorageOptions): Promise<BatchResult[]> {
+  async getBatch(keys: string[], options: StorageOptions = {}): Promise<BatchResult[]> {
     return this.storage.getBatch(keys, options);
   }
   
@@ -597,14 +597,12 @@ export class NuvexClient implements IStore {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const backupId = destination || `nuvex-backup-${timestamp}`;
-      const { incremental = false, compression = true } = options || {};
-      
-      // Get last backup timestamp for incremental backups
-      let lastBackupTime: Date | null = null;
-      if (incremental) {
-        try {
-          const lastBackupMetadata = await this.storage.get('__nuvex_last_backup_metadata');
-          if (lastBackupMetadata && typeof lastBackupMetadata === 'object' && 'timestamp' in lastBackupMetadata) {
+      const { incremental = false, compression = true } = options || {};        // Get last backup timestamp for incremental backups
+        let lastBackupTime: Date | null = null;
+        if (incremental) {
+          try {
+            const lastBackupMetadata = await this.storage.get('__nuvex_last_backup_metadata', {});
+            if (lastBackupMetadata && typeof lastBackupMetadata === 'object' && 'timestamp' in lastBackupMetadata) {
             lastBackupTime = new Date(lastBackupMetadata.timestamp as string);
           }
         } catch (error) {
@@ -633,7 +631,7 @@ export class NuvexClient implements IStore {
           continue;
         }
         
-        const value = await this.storage.get(key);
+        const value = await this.storage.get(key, {});
         const layerInfo = await this.storage.getLayerInfo(key);
         
         if (value !== null) {
@@ -712,7 +710,7 @@ export class NuvexClient implements IStore {
           backupId,
           timestamp: new Date().toISOString(),
           type: incremental ? 'incremental' : 'full'
-        });
+        }, {});
         
         this.log('info', `Backup completed: ${backupId}`, { 
           keyCount: keysProcessed, 
@@ -725,7 +723,7 @@ export class NuvexClient implements IStore {
       } else {
         // Fallback: store in memory/internal storage with warning
         this.log('warn', 'File system not available, storing backup metadata internally (not recommended for production)');
-        await this.storage.set(`__backup:${backupId}`, backupMetadata);
+        await this.storage.set(`__backup:${backupId}`, backupMetadata, {});
         return backupId;
       }
       
@@ -779,7 +777,7 @@ export class NuvexClient implements IStore {
       // Fallback: try to load from internal storage
       if (!backupPackage) {
         this.log('warn', 'External backup not found, checking internal storage');
-        const internalBackupMetadata = await this.storage.get(`__backup:${source}`);
+        const internalBackupMetadata = await this.storage.get(`__backup:${source}`, {});
         if (!internalBackupMetadata) {
           throw new Error(`Backup not found: ${source}`);
         }
@@ -860,7 +858,7 @@ export class NuvexClient implements IStore {
         restoredCount,
         errorCount,
         totalKeys: metadata.keyCount
-      });
+      }, {});
       
       this.log('info', `Restore completed from backup: ${source}`, {
         restoredCount,
@@ -882,15 +880,15 @@ export class NuvexClient implements IStore {
   /**
    * Namespace-aware set operation
    */
-  async setNamespaced(namespace: string, key: string, value: unknown, options?: StorageOptions): Promise<boolean> {
-    return this.set(`${namespace}:${key}`, value, options);
+  async setNamespaced(namespace: string, key: string, value: unknown, options: StorageOptions = {}): Promise<boolean> {
+    return this.storage.set(`${namespace}:${key}`, value, options);
   }
   
   /**
    * Namespace-aware get operation
    */
-  async getNamespaced<T = unknown>(namespace: string, key: string, options?: StorageOptions): Promise<T | null> {
-    return this.get<T>(`${namespace}:${key}`, options);
+  async getNamespaced<T = unknown>(namespace: string, key: string, options: StorageOptions = {}): Promise<T | null> {
+    return this.storage.get<T>(`${namespace}:${key}`, options);
   }
   
   /**
@@ -999,20 +997,20 @@ export class NuvexClient implements IStore {
     try {
       // Get current value from memory first, then fallback to other layers
       let current = 0;
-      const existingValue = await this.storage.get<number>(key);
+      const existingValue = await this.storage.get<number>(key, {});
       
       if (existingValue !== null && typeof existingValue === 'number') {
         current = existingValue;
       } else if (existingValue !== null) {
         // Try to parse as number if it's a string
         const parsed = Number(existingValue);
-        current = isNaN(parsed) ? 0 : parsed;
+        current = !Number.isFinite(parsed) || Number.isNaN(parsed) ? 0 : parsed;
       }
       
       const newValue = current + delta;
       
       // Store the new value in all available layers
-      await this.storage.set(key, newValue);
+      await this.storage.set(key, newValue, {});
       
       return newValue;
     } catch (error) {
@@ -1029,9 +1027,9 @@ export class NuvexClient implements IStore {
    * Set if not exists
    */
   async setIfNotExists<T = unknown>(key: string, value: T, options?: StorageOptions): Promise<boolean> {
-    const exists = await this.exists(key);
+    const exists = await this.storage.exists(key, options);
     if (!exists) {
-      return this.set(key, value, options);
+      return this.storage.set(key, value, options);
     }
     return false;
   }
@@ -1039,12 +1037,12 @@ export class NuvexClient implements IStore {
   /**
    * Get multiple keys with a common prefix
    */
-  async getByPrefix<T = unknown>(prefix: string): Promise<Record<string, T>> {
+  async getByPrefix<T = unknown>(prefix: string, options: StorageOptions = {}): Promise<Record<string, T>> {
     const keys = await this.keys(`${prefix}*`);
     const result: Record<string, T> = {};
     
     for (const key of keys) {
-      const value = await this.get<T>(key);
+      const value = await this.storage.get<T>(key, options);
       if (value !== null) {
         result[key] = value;
       }
@@ -1058,15 +1056,15 @@ export class NuvexClient implements IStore {
     return NuvexClient.getInstance().set(key, value, options);
   }
   
-  static async get<T = unknown>(key: string, options?: StorageOptions): Promise<T | null> {
+  static async get<T = unknown>(key: string, options: StorageOptions = {}): Promise<T | null> {
     return NuvexClient.getInstance().get<T>(key, options);
   }
   
-  static async delete(key: string, options?: StorageOptions): Promise<boolean> {
+  static async delete(key: string, options: StorageOptions = {}): Promise<boolean> {
     return NuvexClient.getInstance().delete(key, options);
   }
   
-  static async exists(key: string, options?: StorageOptions): Promise<boolean> {
+  static async exists(key: string, options: StorageOptions = {}): Promise<boolean> {
     return NuvexClient.getInstance().exists(key, options);
   }
   

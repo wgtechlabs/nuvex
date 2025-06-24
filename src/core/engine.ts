@@ -365,7 +365,7 @@ export class StorageEngine implements Storage {
    * @since 1.0.0
    * @public
    */
-  async get<T = unknown>(key: string, options?: StorageOptions): Promise<T | null> {
+  async get<T = unknown>(key: string, options: StorageOptions = {}): Promise<T | null> {
     const startTime = Date.now();
     this.metrics.totalOperations++;
     
@@ -442,7 +442,7 @@ export class StorageEngine implements Storage {
   
   /**
    * Set value in storage layers
-   */  async set<T = unknown>(key: string, value: T, options?: StorageOptions): Promise<boolean> {
+   */  async set<T = unknown>(key: string, value: T, options: StorageOptions = {}): Promise<boolean> {
     if (!this.connected) {
       return false;
     }
@@ -495,7 +495,7 @@ export class StorageEngine implements Storage {
   /**
    * Delete from all storage layers
    */
-  async delete(key: string, options?: StorageOptions): Promise<boolean> {
+  async delete(key: string, options: StorageOptions = {}): Promise<boolean> {
     const startTime = Date.now();
     this.metrics.totalOperations++;
     
@@ -544,7 +544,7 @@ export class StorageEngine implements Storage {
   /**
    * Check if key exists in any storage layer
    */
-  async exists(key: string, options?: StorageOptions): Promise<boolean> {
+  async exists(key: string, options: StorageOptions = {}): Promise<boolean> {
     try {
       // Specific layer requested
       if (options?.layer) {
@@ -643,7 +643,7 @@ export class StorageEngine implements Storage {
     return results;
   }
   
-  async getBatch(keys: string[], options?: StorageOptions): Promise<BatchResult[]> {
+  async getBatch(keys: string[], options: StorageOptions = {}): Promise<BatchResult[]> {
     const results: BatchResult[] = [];
     
     for (const key of keys) {
@@ -721,7 +721,7 @@ export class StorageEngine implements Storage {
     };
   }
   
-  async keys(pattern?: string): Promise<string[]> {
+  async keys(pattern = '*'): Promise<string[]> {
     const allKeys = new Set<string>();
     
     // Get memory keys
@@ -746,11 +746,14 @@ export class StorageEngine implements Storage {
     return Array.from(allKeys);
   }
   
-  async clear(pattern?: string): Promise<number> {
+  async clear(pattern = '*'): Promise<number> {
     let cleared = 0;
-    
-    // Clear memory
-    if (pattern) {
+      // Clear memory
+    if (pattern === '*') {
+      cleared = this.memoryCache.size;
+      this.memoryCache.clear();
+      this.memoryCacheTTL.clear();
+    } else {
       for (const key of this.memoryCache.keys()) {
         if (this.matchPattern(key, pattern)) {
           this.memoryCache.delete(key);
@@ -758,25 +761,33 @@ export class StorageEngine implements Storage {
           cleared++;
         }
       }
-    } else {
-      cleared = this.memoryCache.size;
-      this.memoryCache.clear();
-      this.memoryCacheTTL.clear();
     }
     
     // Clear Redis
     if (this.redisClient) {
       try {
-        if (pattern) {
+        if (pattern === '*') {
+          await this.redisClient.flushDb();
+        } else {
           const keys = await this.redisClient.keys(pattern);
           if (keys.length > 0) {
             await this.redisClient.del(keys);
           }
+        }      } catch (error) {
+        this.log('warn', 'Error clearing Redis', { error: (error as Error).message });
+      }
+    }
+
+    // Clear PostgreSQL  
+    if (this.db) {
+      try {
+        if (pattern === '*') {
+          await this.db.query('DELETE FROM nuvex_storage');
         } else {
-          await this.redisClient.flushDb();
+          await this.db.query('DELETE FROM nuvex_storage WHERE key LIKE $1', [pattern.replace('*', '%')]);
         }
       } catch (error) {
-        this.log('warn', 'Error clearing Redis', { error: (error as Error).message });
+        this.log('warn', 'Error clearing PostgreSQL', { error: (error as Error).message });
       }
     }
     

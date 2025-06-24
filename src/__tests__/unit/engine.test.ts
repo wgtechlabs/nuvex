@@ -1,11 +1,17 @@
 /**
  * StorageEngine Unit Tests
  * Tests for the core storage engine functionality
+ * 
+ * IMPORTANT: This file uses secure environment-based test configuration.
+ * Zero hardcoded credentials - all config generated dynamically.
+ * 
+ * @fileoverview Engine unit tests with zero hardcoded credentials
  */
 
 import { StorageEngine } from '../../core/engine.js';
 import { StorageLayer } from '../../types/index.js';
 import { mockNuvexConfig } from '../fixtures/data.js';
+import { getTestPostgresConfig } from '../fixtures/config.js';
 import { MockRedisClient } from '../mocks/redis.mock.js';
 import { MockPgPool } from '../mocks/postgres.mock.js';
 
@@ -153,10 +159,8 @@ describe('StorageEngine', () => {
     test('should perform batch get operations', async () => {
       // First set some values
       await storageEngine.set('batch:1', { id: 1 });
-      await storageEngine.set('batch:2', { id: 2 });
-
-      const keys = ['batch:1', 'batch:2', 'batch:nonexistent'];
-      const results = await storageEngine.getBatch(keys);
+      await storageEngine.set('batch:2', { id: 2 });      const keys = ['batch:1', 'batch:2', 'batch:nonexistent'];
+      const results = await storageEngine.getBatch(keys, {});
       
       expect(results).toHaveLength(3);
       expect(results[0].success).toBe(true);
@@ -390,17 +394,10 @@ describe('StorageEngine', () => {
       expect(retrieved).toEqual(largeData);
     });
   });
-
-  describe('Configuration Edge Cases', () => {
-    test('should work with minimal configuration', async () => {
+  describe('Configuration Edge Cases', () => {    test('should work with minimal configuration', async () => {
+      // Use secure environment-based configuration with zero hardcoded credentials
       const minimalConfig = {
-        postgres: {
-          host: 'localhost',
-          port: 5432,
-          database: 'test',
-          user: 'test',
-          password: 'test'
-        }
+        postgres: getTestPostgresConfig()
       };
       
       const minimalEngine = new StorageEngine(minimalConfig);

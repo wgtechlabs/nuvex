@@ -1,11 +1,8 @@
 import tsEslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
-import js from '@eslint/js';
 import security from 'eslint-plugin-security';
 
 export default [
-  js.configs.recommended,
-  security.configs.recommended,
   {
     files: ['src/**/*.ts'],
     languageOptions: {
@@ -31,26 +28,23 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': tsEslint,
       'security': security
     },
     rules: {
-      // TypeScript rules
-      '@typescript-eslint/no-unused-vars': ['error', { 
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        destructuredArrayIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_'
-      }],
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-inferrable-types': 'warn',
-      
-      // General rules
-      'prefer-const': 'error',
-      'no-var': 'error',
-      'no-console': 'off',
-      'no-unused-vars': 'off' // Let TypeScript handle this
+      // Only security rules - no other ESLint rules
+      'security/detect-object-injection': 'warn',
+      'security/detect-non-literal-regexp': 'warn',
+      'security/detect-unsafe-regex': 'warn',
+      'security/detect-buffer-noassert': 'error',
+      'security/detect-child-process': 'warn',
+      'security/detect-disable-mustache-escape': 'error',
+      'security/detect-eval-with-expression': 'error',
+      'security/detect-no-csrf-before-method-override': 'error',
+      'security/detect-non-literal-fs-filename': 'warn',
+      'security/detect-non-literal-require': 'warn',
+      'security/detect-possible-timing-attacks': 'warn',
+      'security/detect-pseudoRandomBytes': 'error',
+      'security/detect-bidi-characters': 'error'
     }
   },
   {
@@ -88,39 +82,23 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': tsEslint,
       'security': security
     },
     rules: {
-      // TypeScript rules for tests
-      '@typescript-eslint/no-unused-vars': ['error', { 
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        destructuredArrayIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_'
-      }],
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'off', // More lenient for tests
-      '@typescript-eslint/no-inferrable-types': 'warn',
-      
-      // General rules
-      'prefer-const': 'error',
-      'no-var': 'error',
-      'no-console': 'off',
-      'no-unused-vars': 'off',
-      'no-undef': 'off', // Jest globals are handled by languageOptions.globals
-      
-      // Security rules (disabled for test files where appropriate)
+      // Relaxed security rules for test files
       'security/detect-object-injection': 'off', // Tests may use dynamic object access
-      'security/detect-non-literal-require': 'off' // Tests may dynamically require modules
-    }
-  },
-  {
-    files: ['src/interfaces/**/*.ts', 'src/types/**/*.ts'],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-explicit-any': 'off'
+      'security/detect-non-literal-require': 'off', // Tests may dynamically require modules
+      'security/detect-non-literal-regexp': 'warn',
+      'security/detect-unsafe-regex': 'warn',
+      'security/detect-buffer-noassert': 'error',
+      'security/detect-child-process': 'warn',
+      'security/detect-disable-mustache-escape': 'error',
+      'security/detect-eval-with-expression': 'error',
+      'security/detect-no-csrf-before-method-override': 'error',
+      'security/detect-non-literal-fs-filename': 'off', // Tests may use dynamic filenames
+      'security/detect-possible-timing-attacks': 'off', // Tests may use timing-sensitive operations
+      'security/detect-pseudoRandomBytes': 'error',
+      'security/detect-bidi-characters': 'error'
     }
   },
   {

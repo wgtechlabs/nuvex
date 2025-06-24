@@ -1,7 +1,18 @@
 /**
  * Jest Test Setup
- * Global test configuration and utilities
+ * Global test configuration and utilities with zero hardcoded credentials
  */
+
+import { initializeTestEnvironment, validateTestEnvironment, cleanupTestEnvironment } from './fixtures/config.js';
+
+// Initialize secure test environment
+initializeTestEnvironment();
+
+// Validate test environment
+const validation = validateTestEnvironment();
+if (!validation.isValid) {
+  throw new Error('Test environment validation failed. Check configuration.');
+}
 
 // Increase timeout for integration tests
 jest.setTimeout(30000);
@@ -21,6 +32,9 @@ afterAll(() => {
   // Restore console methods
   console.error = originalError;
   console.warn = originalWarn;
+  
+  // Cleanup test environment
+  cleanupTestEnvironment();
 });
 
 // Global test utilities

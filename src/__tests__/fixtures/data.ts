@@ -1,37 +1,22 @@
 /**
  * Test Fixtures
  * Sample data and configurations for tests
+ * 
+ * IMPORTANT: This file contains test data only.
+ * All configurations use secure environment-based settings with zero hardcoded credentials.
+ * 
+ * @fileoverview Test fixtures with zero hardcoded credentials
  */
 
 import type { NuvexConfig } from '../../types/index.js';
+import { getTestConfig, getTestRedisConfig, getTestPostgresConfig } from './config.js';
 
-export const mockRedisConfig = {
-  url: 'redis://localhost:6379',
-  host: 'localhost',
-  port: 6379,
-  db: 0
-};
+// Use environment-based configuration to avoid hardcoded credentials
+export const mockRedisConfig = getTestRedisConfig();
 
-export const mockPostgresConfig = {
-  host: 'localhost',
-  port: 5432,
-  database: 'test_db',
-  user: 'test_user',
-  password: 'test_pass'
-};
+export const mockPostgresConfig = getTestPostgresConfig();
 
-export const mockNuvexConfig: NuvexConfig = {
-  postgres: mockPostgresConfig,
-  redis: mockRedisConfig,
-  memory: {
-    ttl: 3600000,
-    maxSize: 1000,
-    cleanupInterval: 60000
-  },
-  logging: {
-    enabled: false
-  }
-};
+export const mockNuvexConfig: NuvexConfig = getTestConfig();
 
 export const sampleData = {
   user: {

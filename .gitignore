@@ -16,9 +16,9 @@ build/
 lib/
 .out
 .storybook-out
-.next         # Next.js build output
-.nuxt         # Nuxt.js build / generate output
-dist          # Nuxt.js/other build output
+.next
+.nuxt
+dist
 
 # -----------------------------------------------------------------------------
 # TypeScript cache
@@ -38,8 +38,8 @@ pids/
 # -----------------------------------------------------------------------------
 coverage/
 *.lcov
-.nyc_output/          # nyc test coverage
-jest_*                # Jest
+.nyc_output/
+jest_*
 test-results/
 playwright-report/
 test-output/
@@ -54,13 +54,14 @@ docs/node_modules/
 # -----------------------------------------------------------------------------
 # Optional caches
 # -----------------------------------------------------------------------------
-.npm                  # npm cache
-.eslintcache          # eslint cache
-.rpt2_cache/          # Microbundle cache
+.npm
+.eslintcache
+.dccache
+.rpt2_cache/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/
-.cache                # parcel-bundler cache
+.cache
 .parcel-cache
 
 # -----------------------------------------------------------------------------
@@ -142,3 +143,8 @@ performance-logs/
 .yarn/cache/
 .yarn/build-state.yml
 .yarn/install-state.gz
+
+# -----------------------------------------------------------------------------
+# Project-specific backup files
+# -----------------------------------------------------------------------------
+nuvex-backups/
