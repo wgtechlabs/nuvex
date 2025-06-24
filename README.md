@@ -2,44 +2,28 @@
 
 [![github actions workflow status](https://img.shields.io/github/actions/workflow/status/wgtechlabs/nuvex/test.yml?branch=main&style=flat-square&logo=github&labelColor=181717)](https://github.com/wgtechlabs/nuvex/actions/workflows/test.yml) [![codecov](https://img.shields.io/codecov/c/github/wgtechlabs/nuvex?token=PWRJTBVKQ9&style=flat-square&logo=codecov&labelColor=181717)](https://codecov.io/gh/wgtechlabs/nuvex) [![npm downloads](https://img.shields.io/npm/d18m/nuvex?style=flat-square&logo=npm&label=installs&labelColor=181717&color=%23CD0000)](https://www.npmjs.com/package/nuvex) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![release](https://img.shields.io/github/release/wgtechlabs/nuvex.svg?logo=github&labelColor=181717&color=green&style=flat-square)](https://github.com/wgtechlabs/nuvex/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/nuvex/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/nuvex/blob/main/LICENSE)
 
-[![banner](https://raw.githubusercontent.com/wgtechlabs/nuvex/main/.github/assets/repo_banner.jpg)](https://github.com/wgtechlabs/nuvex)
+**Nuvex** is the ultimate production-ready, TypeScript-first 3-layer storage SDK for Node.js applications. Combining the speed of memory cache, the reliability of Redis, and the persistence of PostgreSQL — all with one simple API and zero configuration hassle. Born from real-world development challenges and proven in production environments, Nuvex delivers enterprise-grade storage with intelligent caching that actually works.
 
-WG's Nuvex is the **ultimate multi-layer storage solution for Node.js developers** - a lightweight, battle-tested SDK specifically engineered for Discord bots, Telegram bots, web servers, APIs, and server-side applications. Born from real-world development challenges and proven in production environments, Nuvex delivers enterprise-grade storage with zero complexity, intelligent data tier management, and **comprehensive TypeScript support**.
+The first storage SDK with built-in automatic data promotion/demotion, comprehensive health monitoring, and backup/restore capabilities. Stop wrestling with complex storage configurations and start building amazing applications with confidence. Whether you're creating high-performance APIs, developing microservices, or deploying production servers, Nuvex provides intelligent multi-layer storage that scales with your application's growth — from your first prototype to handling millions of requests across distributed systems.
 
-**The first multi-layer storage SDK with built-in intelligent caching and comprehensive Redis/PostgreSQL integration.** Stop wrestling with complex storage configurations and start building amazing applications efficiently. Whether you're creating the next viral Discord community bot, building high-performance APIs, developing microservices, or deploying production servers, Nuvex provides intelligent three-tier storage with automatic data promotion/demotion, seamless fallback mechanisms, and built-in performance monitoring that scales with your application's growth - from your first "Hello World" to handling millions of requests across distributed systems.
+## ⚡ Why Developers Choose Nuvex
 
-## ❣️ Motivation
+**Tired of juggling Redis, PostgreSQL, and in-memory caches?** You're not alone.
 
-Modern bots and APIs need fast, reliable, and scalable storage. Traditional solutions force you to choose between speed (caching) and reliability (databases), making development complex and error-prone.
+Every developer has been there: your app is slow because you're hitting the database for every request. You add Redis, now you're managing cache invalidation. You add memory caching, now you're dealing with three different APIs and complex fallback logic. One service goes down, your entire storage layer breaks.
 
-**Nuvex solves this by providing a unified, intelligent storage layer that combines caching and persistence—out of the box.** No more manual cache management or worrying about data loss. Just simple, efficient storage for all your Node.js applications.
+**Nuvex solves this once and for all:**
 
-## ✨ Key Features
+- **🎯 One API, Zero Headaches**: Write `storage.set()` and `storage.get()` — Nuvex handles Memory → Redis → PostgreSQL automatically
+- **⚡ Performance That Just Works**: Sub-millisecond access for hot data, with intelligent promotion keeping your most-used data blazing fast
+- **🛡️ Production-Grade Reliability**: Battle-tested with automatic error recovery and graceful fallbacks when services go down
+- **📊 Built-in Observability**: Real-time metrics and health monitoring so you know exactly what's happening
+- **💪 TypeScript-First DX**: Full type safety and excellent IntelliSense that makes coding a joy
+- **🔧 Zero Configuration**: Works perfectly out of the box — no complex setup, no YAML files, no DevOps nightmares
 
-- **🗄️ Multi-layer Architecture**: Three-tier intelligent storage system with **Memory Cache (24hr TTL)**, **Redis Cache (3-day TTL)**, and **PostgreSQL (permanent)** - the first SDK with comprehensive automated data tier management.
-- **⚡ High Performance Storage**: Sub-millisecond access for frequently used data with intelligent promotion and demotion based on access patterns.
-- **🔄 Intelligent Fallback**: Graceful degradation when storage layers are unavailable - automatic layer switching with zero downtime.
-- **📊 Built-in Metrics & Monitoring**: Comprehensive cache hit rates, performance analytics, and health monitoring with real-time insights.
-- **🔌 Pluggable Logging Integration**: Optimized for [@wgtechlabs/log-engine](https://github.com/wgtechlabs/log-engine) with support for any logger - structured logging that just works.
-- **💪 TypeScript First**: Full type safety with comprehensive interfaces and excellent developer experience across all storage operations.
-- **🛡️ Production Ready**: Connection pooling, automatic error recovery, health checks, and enterprise-grade reliability features.
-- **🚀 Zero Configuration**: Intelligent defaults that work out of the box - just connect and start storing data efficiently.
-- **🎯 Smart Data Management**: Automatic data tier optimization based on access frequency and patterns - hot data stays fast, cold data stays persistent.
-- **🔗 Seamless Integration**: Simple API that works seamlessly with existing Node.js applications - Discord bots, APIs, web servers, and microservices.
-- **⚙️ Auto-Layer Selection**: Intelligent storage layer selection based on data type, size, and access patterns - no manual configuration required.
-- **📈 Scalable Architecture**: Designed to scale from small applications to enterprise-level systems handling millions of operations.
+**The result?** You focus on building features while Nuvex handles the storage complexity. From prototype to production, from thousands to millions of requests — storage that scales with your ambitions.
 
-## 🤔 How It Works
-<!-- markdownlint-disable MD051 -->
-1. Nuvex automatically initializes your three-tier storage architecture with intelligent defaults optimized for your environment
-2. When you store data, Nuvex intelligently selects the optimal storage layer based on data size, type, and access patterns
-3. Each data retrieval checks layers in order: **Memory → Redis → PostgreSQL**, providing sub-millisecond to millisecond response times
-4. Frequently accessed data is automatically promoted to faster layers, while unused data gracefully demotes to persistent storage
-5. Built-in health monitoring continuously tracks layer availability and automatically handles failover with zero downtime
-6. Performance metrics are collected in real-time, providing insights into cache hit rates, response times, and layer utilization
-
-Ready to supercharge your application storage? Get started in seconds with our [simple installation](#📦-installation)!
-<!-- markdownlint-enable MD051 -->
+**Ready to 10x your storage performance?** [Get started now](#-quick-start) ⚡
 
 ## 🤗 Special Thanks
 
@@ -52,40 +36,21 @@ Ready to supercharge your application storage? Get started in seconds with our [
 
 ## 💸 Sponsored Ads
 
-Open source development is resource-intensive. These **sponsored ads help keep Nuvex free and actively maintained** while connecting you with tools and services that support open-source development.
+Open source development is resource-intensive. These **sponsored ads help keep Log Engine free and actively maintained** while connecting you with tools and services that support open-source development.
 
 [![sponsored ads](https://gitads.dev/v1/ad-serve?source=wgtechlabs/nuvex@github)](https://gitads.dev/v1/ad-track?source=wgtechlabs/nuvex@github)
 
-## Installation
+## 🚀 Quick Start
 
 ```bash
-npm install nuvex
+npm install nuvex pg redis
 ```
-
-### Peer Dependencies
-
-```bash
-# For PostgreSQL support
-npm install pg @types/pg
-
-# For Redis support  
-npm install redis
-
-# Recommended: Enhanced logging with log-engine
-npm install @wgtechlabs/log-engine
-```
-
-> **💡 Recommended:** Use [`@wgtechlabs/log-engine`](https://github.com/wgtechlabs/log-engine) for enhanced logging capabilities, structured output, and seamless integration with Nuvex.
-
-## 🕹️ Usage
-
-### Quick Start
 
 ```typescript
-import { Nuvex } from 'nuvex';
+import { NuvexClient } from 'nuvex';
 
-// Initialize Nuvex with auto-configuration
-const storage = new Nuvex({
+// Initialize once, use everywhere
+const storage = await NuvexClient.initialize({
   postgres: {
     host: 'localhost',
     port: 5432,
@@ -93,40 +58,48 @@ const storage = new Nuvex({
     user: 'postgres',
     password: 'password'
   },
-  redis: {
-    url: 'redis://localhost:6379'
-  }
+  redis: { url: 'redis://localhost:6379' } // Optional but recommended
 });
 
-// Connect to storage layers
-await storage.connect();
-
-// Store data (automatically chooses optimal layer)
-await storage.set('user:123', { 
-  name: 'John', 
-  email: 'john@example.com',
-  preferences: { theme: 'dark' }
-});
-
-// Retrieve data (checks layers in order: Memory → Redis → PostgreSQL)
+// Simple, powerful API
+await storage.set('user:123', { name: 'John', email: 'john@example.com' });
 const user = await storage.get('user:123');
+await storage.delete('user:123');
 
-// Set with custom TTL and layer preferences
-await storage.set('session:abc', sessionData, { 
-  ttl: 3600,
-  layer: 'redis' // Force specific layer
-});
+// Namespace your data
+await storage.setNamespaced('sessions', 'abc123', { userId: 789, expires: Date.now() + 3600000 });
+const session = await storage.getNamespaced('sessions', 'abc123');
 
-// Batch operations for high performance
-await storage.setBatch([
-  { operation: 'set', key: 'key1', value: 'value1' },
-  { operation: 'set', key: 'key2', value: 'value2' }
+// Batch operations for efficiency
+const results = await storage.setBatch([
+  { operation: 'set', key: 'product:1', value: { name: 'iPhone', price: 999 } },
+  { operation: 'set', key: 'product:2', value: { name: 'MacBook', price: 1999 } }
 ]);
+
+// Health monitoring
+const health = await storage.healthCheck();
+console.log('Storage healthy:', health.overall);
 ```
 
-### Configuration Options
+## 📦 Installation
 
-#### Basic Configuration
+```bash
+npm install nuvex pg redis
+```
+
+## 🎯 Perfect For Any Node.js Application
+
+- **🌐 Web APIs**: Session management, response caching, rate limiting
+- **🛒 E-commerce**: Product catalogs, shopping carts, user preferences  
+- **🎮 Gaming**: Player data, leaderboards, real-time game state
+- **🤖 Bots & Automation**: User state, conversation flow, command history
+- **📱 Mobile Backends**: User profiles, app data, push notifications
+- **🏢 Enterprise**: Configuration management, temporary data, metrics
+- **📊 Analytics**: Event storage, metrics aggregation, reporting data
+
+## 📚 Documentation
+
+### Configuration
 
 ```typescript
 const config = {
@@ -137,46 +110,56 @@ const config = {
     user: 'postgres',
     password: 'password'
   },
-  redis: {
-    url: 'redis://localhost:6379',
-    ttl: 259200 // 3 days
-  },
-  memory: {
-    ttl: 86400000, // 24 hours in milliseconds
-    maxSize: 10000 // Maximum entries
-  }
-};
+  redis: { url: 'redis://localhost:6379' }, // Optional but recommended
+  memory: { ttl: 86400000, maxSize: 10000 }, // Optional
+  logging: { enabled: true } // Optional
 };
 ```
 
-#### Logging Integration
-
-##### Enhanced Logging with @wgtechlabs/log-engine
-
-[`@wgtechlabs/log-engine`](https://github.com/wgtechlabs/log-engine) is specifically designed to work seamlessly with Nuvex:
+### API Reference
 
 ```typescript
-import { LogEngine } from '@wgtechlabs/log-engine';
-import { Nuvex } from 'nuvex';
+// Basic operations
+await storage.set('key', value, { ttl: 3600 });
+const data = await storage.get('key');
+await storage.delete('key');
+await storage.exists('key');
 
-// Configure log-engine
-LogEngine.configure({
-  level: 'info',
-  service: 'nuvex-app',
-  version: '1.0.0',
-  environment: 'production'
-});
+// Namespace operations
+await storage.setNamespaced('users', '123', userData);
+const user = await storage.getNamespaced('users', '123');
 
-const storage = new Nuvex({
-  postgres: { /* ... */ },
-  redis: { /* ... */ },
-  logging: {
-    enabled: true,
-    logger: LogEngine,
-    level: 'info',
-    includeMetrics: true,
-    includePerformance: true
-  }
+// Batch operations
+const results = await storage.setBatch([
+  { operation: 'set', key: 'key1', value: 'value1' },
+  { operation: 'get', key: 'key2' }
+]);
+
+// Atomic operations
+const newValue = await storage.increment('counter', 5);
+await storage.decrement('counter', 2);
+```
+
+### Monitoring & Maintenance
+
+```typescript
+// Health monitoring
+const health = await storage.healthCheck();
+console.log('All systems:', health.overall ? '✅' : '❌');
+
+// Performance metrics
+const metrics = storage.getMetrics();
+console.log(`Cache hit rate: ${(metrics.memoryHits / metrics.totalOperations * 100).toFixed(2)}%`);
+
+// Backup & restore
+const backupId = await storage.backup('my-backup', { compression: true });
+await storage.restore('my-backup', { clearExisting: false });
+
+// Query operations
+const results = await storage.query({
+  pattern: 'user:*',
+  limit: 100,
+  sortBy: 'createdAt'
 });
 ```
 
@@ -310,113 +293,38 @@ const metrics = storage.getMetrics();
 const health = await storage.healthCheck();
 ```
 
-## 🗄️ Storage Layer Architecture
+## 🏗️ How It Works
 
-Nuvex uses a sophisticated three-tier storage system that automatically optimizes data placement and retrieval:
+**3-Layer Architecture** → **Automatic Optimization** → **Lightning Fast**
 
-### Memory Cache (Layer 1)
+1. **Memory** (< 1ms) → **Redis** (1-5ms) → **PostgreSQL** (5-50ms)
+2. **Smart promotion**: Hot data moves to faster layers automatically
+3. **Graceful fallback**: If Redis is down, PostgreSQL takes over seamlessly
+4. **Zero config**: Works perfectly out of the box with sensible defaults
 
-- **TTL**: 24 hours (configurable)
-- **Use case**: Hot data, session information
-- **Performance**: < 1ms access time
+## 🤝 Community & Support
 
-### Redis Cache (Layer 2)
-
-- **TTL**: 3 days (configurable)  
-- **Use case**: Warm data, distributed caching
-- **Performance**: 1-5ms access time
-
-### PostgreSQL (Layer 3)
-
-- **TTL**: Permanent storage
-- **Use case**: Cold data, critical information
-- **Performance**: 5-50ms access time
-
-## Migration Guide
-
-### From Bot-Specific Storage
-
-If you're migrating from a bot-specific implementation:
-
-```typescript
-// Old bot-specific way
-await botsStore.storeTicket(ticketData);
-await botsStore.getUserState(userId);
-
-// New generic way
-await storage.set(`ticket:${ticketId}`, ticketData);
-await storage.get(`user:${userId}:state`);
-```
-
-## Performance
-
-Nuvex is designed for high-performance applications:
-
-- **Memory Cache**: Sub-millisecond access for hot data
-- **Intelligent Caching**: Automatic promotion of frequently accessed data
-- **Connection Pooling**: Optimized database connections
-- **Batch Operations**: Efficient bulk data operations
-
-## Error Handling
-
-Nuvex provides graceful error handling and fallback mechanisms:
-
-```typescript
-try {
-  await storage.set('key', 'value');
-} catch (error) {
-  // Nuvex automatically falls back to available layers
-  console.log('Storage operation failed:', error);
-}
-```
-
-## Health Monitoring
-
-```typescript
-const health = await storage.healthCheck();
-// Returns: { memory: true, redis: true, postgres: true, overall: true }
-
-const metrics = storage.getMetrics();
-// Returns: { memoryHits: 150, redisHits: 45, postgresHits: 12, ... }
-```
-
-## 💬 Community Discussions
-
-Join our community discussions to get help, share ideas, and connect with other users:
-
-- 📣 **[Announcements](https://github.com/wgtechlabs/nuvex/discussions/categories/announcements)**: Official updates from the maintainer
-- 📸 **[Showcase](https://github.com/wgtechlabs/nuvex/discussions/categories/showcase)**: Show and tell your implementation
-- 💖 **[Wall of Love](https://github.com/wgtechlabs/nuvex/discussions/categories/wall-of-love)**: Share your experience with the library
-- 🛟 **[Help & Support](https://github.com/wgtechlabs/nuvex/discussions/categories/help-support)**: Get assistance from the community
-- 🧠 **[Ideas](https://github.com/wgtechlabs/nuvex/discussions/categories/ideas)**: Suggest new features and improvements
-
-## 🛟 Help & Support
-
-### Getting Help
-
-Need assistance with the library? Here's how to get help:
-<!-- markdownlint-disable MD051 -->
-- **Community Support**: Check the [Help & Support](https://github.com/wgtechlabs/nuvex/discussions/categories/help-support) category in our GitHub Discussions for answers to common questions.
-- **Ask a Question**: Create a [new discussion](https://github.com/wgtechlabs/nuvex/discussions/new?category=help-support) if you can't find answers to your specific issue.
-- **Documentation**: Review the [usage instructions](#🕹️-usage) in this README for common examples and configurations.
-- **Known Issues**: Browse [existing issues](https://github.com/wgtechlabs/nuvex/issues) to see if your problem has already been reported.
-<!-- markdownlint-enable MD051 -->
-
-### Reporting Issues
-
-Please report any issues, bugs, or improvement suggestions by [creating a new issue](https://github.com/wgtechlabs/nuvex/issues/new/choose). Before submitting, please check if a similar issue already exists to avoid duplicates.
-
-### Security Vulnerabilities
-
-For security vulnerabilities, please do not report them publicly. Follow the guidelines in our [security policy](./security.md) to responsibly disclose security issues.
-
-Your contributions to improving this project are greatly appreciated! 🙏✨
+- 💬 **[GitHub Discussions](https://github.com/wgtechlabs/nuvex/discussions)** - Ask questions, share ideas
+- 🐛 **[Issues](https://github.com/wgtechlabs/nuvex/issues)** - Report bugs, request features  
+- 📖 **[Documentation](https://github.com/wgtechlabs/nuvex#readme)** - Complete API reference
+- ⭐ **[Star this repo](https://github.com/wgtechlabs/nuvex)** - Show your support!
 
 ## 🎯 Contributing
 
-Contributions are welcome, create a pull request to this repo and I will review your code. Please consider to submit your pull request to the `dev` branch. Thank you!
+We ❤️ contributions! Here's how you can help:
 
-Read the project's [contributing guide](./CONTRIBUTING.md) for more info, including testing guidelines and requirements.
+- **🐛 Report bugs** - Found an issue? [Open an issue](https://github.com/wgtechlabs/nuvex/issues/new)
+- **💡 Suggest features** - Have ideas? [Start a discussion](https://github.com/wgtechlabs/nuvex/discussions)
+- **📝 Improve docs** - Help make our documentation better
+- **🔧 Submit PRs** - Check out our [contributing guide](./CONTRIBUTING.md) to get started
+
+## 🛟 Help & Support
+
+Need assistance? Here's how to get support:
+
+- **Community Support**: Check the [Help & Support](https://github.com/wgtechlabs/nuvex/discussions/categories/help-support) discussions
+- **Ask Questions**: Create a [new discussion](https://github.com/wgtechlabs/nuvex/discussions/new?category=help-support)
+- **Security Issues**: Follow our [security policy](./security.md) for responsible disclosure
 
 ## 🙏 Sponsor
 
@@ -435,20 +343,18 @@ Found this project helpful? Consider nominating me **(@warengonzaga)** for the [
 
 I'm committed to providing a welcoming and inclusive environment for all contributors and users. Please review the project's [Code of Conduct](./code_of_conduct.md) to understand the community standards and expectations for participation.
 
-## 📃 License
+## 📄 License
 
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT). See the [LICENSE](LICENSE) file for the full license text.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ## 📝 Author
 
-This project is created by **[Waren Gonzaga](https://github.com/warengonzaga)** under [WG Technology Labs](https://github.com/wgtechlabs), with the help of awesome [contributors](https://github.com/wgtechlabs/nuvex/graphs/contributors).
-
-**Latest Version:** v1.0.0 - Enhanced with intelligent multi-layer storage, comprehensive TypeScript support, and production-ready reliability.
+This project is created by **[Waren Gonzaga](https://github.com/warengonzaga)** at [WG Technology Labs](https://github.com/wgtechlabs), with the help of awesome *[contributors](https://github.com/wgtechlabs/nuvex/graphs/contributors)*.
 
 [![contributors](https://contrib.rocks/image?repo=wgtechlabs/nuvex)](https://github.com/wgtechlabs/nuvex/graphs/contributors)
 
 ---
 
-💻 with ❤️ by [Waren Gonzaga](https://warengonzaga.com) under [WG Technology Labs](https://wgtechlabs.com), and [Him](https://www.youtube.com/watch?v=HHrxS4diLew&t=44s) 🙏
+💻 with ❤️ by [Waren Gonzaga](https://warengonzaga.com) at [WG Technology Labs](https://wgtechlabs.com), and [Him](https://www.youtube.com/watch?v=HHrxS4diLew&t=44s) 🙏
 
 <!-- GitAds-Verify: [TO_BE_CONFIGURED] -->

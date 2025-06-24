@@ -14,6 +14,7 @@ lerna-debug.log*
 dist/
 build/
 lib/
+docs/
 .out
 .storybook-out
 .next

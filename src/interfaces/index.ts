@@ -194,26 +194,5 @@ export interface CacheLayer {
   delete(key: string): Promise<boolean>;
   exists(key: string): Promise<boolean>;
   clear(): Promise<number>;
-  keys(pattern?: string): Promise<string[]>;
-  ttl(key: string): Promise<number>;
-}
-
-// ===== Legacy Interfaces (for bot migration) =====
-
-export interface IBotsStore {
-  // Ticket operations
-  storeTicket(ticketData: any): Promise<boolean>;
-  getTicketByMessageId(messageId: number): Promise<any | null>;
-  getTicketByConversationId(conversationId: string): Promise<any | null>;
-  updateTicketStatus(ticketId: string, status: string): Promise<boolean>;
-  
-  // User state operations
-  storeUserState(userId: number, state: any): Promise<boolean>;
-  getUserState(userId: number): Promise<any | null>;
-  clearUserState(userId: number): Promise<boolean>;
-  
-  // Customer operations
-  storeCustomer(customerData: any): Promise<boolean>;
-  getCustomer(customerId: string): Promise<any | null>;
-  updateCustomer(customerId: string, updates: any): Promise<boolean>;
+  keys(pattern?: string): Promise<string[]>;  ttl(key: string): Promise<number>;
 }
