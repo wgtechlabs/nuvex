@@ -753,27 +753,32 @@ export class StorageEngine implements Storage {
     };
   }
   
+  /**
+   * Get all keys matching a pattern
+   * 
+   * **IMPORTANT**: This method is currently not fully functional with the modular layer architecture.
+   * Pattern-based key listing requires each layer to expose a keys() method, which is not yet
+   * implemented in the StorageLayerInterface.
+   * 
+   * **Current Behavior**: Returns empty array
+   * 
+   * **Future Implementation**: Will require adding keys() method to StorageLayerInterface and
+   * implementing it in each layer class (MemoryStorage, RedisStorage, PostgresStorage).
+   * 
+   * @param _pattern - Glob pattern for key matching (currently not used)
+   * @returns Promise resolving to array of matching keys (currently always empty)
+   * 
+   * @deprecated This method needs reimplementation for the modular architecture
+   * @see https://github.com/wgtechlabs/nuvex/issues/XXX for tracking
+   */
   async keys(_pattern = '*'): Promise<string[]> {
     const allKeys = new Set<string>();
     
-    // Note: This is a simplified implementation that only checks Redis for keys
-    // Memory layer doesn't expose keys(), and PostgreSQL would require table scan
+    // TODO: Implement keys() method in StorageLayerInterface and each layer class
+    // This would allow proper pattern-based key listing across all layers
+    // For now, return empty array to maintain API compatibility
     
-    // Get Redis keys (L2) - primary source for key listing
-    if (this.l2Redis && this.l2Redis.isConnected()) {
-      try {
-        // Note: This requires direct access to Redis client which we don't expose in the layer
-        // For now, we'll skip memory keys iteration to maintain layer encapsulation
-        // TODO: Add keys() method to StorageLayerInterface if pattern-based key listing is needed
-        this.log('warn', 'keys() method requires direct Redis client access - using degraded mode');
-      } catch (error) {
-        this.log('warn', 'Error getting Redis keys', { 
-          error: error instanceof Error ? error.message : String(error) 
-        });
-      }
-    }
-    
-    // PostgreSQL keys would require a table scan - skip for performance
+    this.log('warn', 'keys() method not fully implemented with modular layers - returning empty array');
     
     return Array.from(allKeys);
   }

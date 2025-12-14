@@ -259,7 +259,8 @@ export class MemoryStorage implements StorageLayerInterface {
       // Memory is always available if the app is running
       // Perform a quick sanity check
       const testKey = '__nuvex_health_check__';
-      this.cache.set(testKey, { value: true });
+      const testEntry: MemoryCacheEntry = { value: true };
+      this.cache.set(testKey, testEntry);
       this.cache.delete(testKey);
       return true;
     } catch (error) {
