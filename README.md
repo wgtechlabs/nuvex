@@ -43,7 +43,7 @@ Open source development is resource-intensive. These **sponsored ads help keep L
 ## 🚀 Quick Start
 
 ```bash
-npm install nuvex pg redis
+pnpm add nuvex pg redis
 ```
 
 ```typescript
@@ -84,7 +84,7 @@ console.log('Storage healthy:', health.overall);
 ## 📦 Installation
 
 ```bash
-npm install nuvex pg redis
+pnpm add nuvex pg redis
 ```
 
 ## 🎯 Perfect For Any Node.js Application
