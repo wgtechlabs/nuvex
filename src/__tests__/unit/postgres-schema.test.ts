@@ -61,6 +61,106 @@ describe('PostgreSQL Configurable Schema', () => {
       expect(sql).toContain('data_value_v1 JSONB NOT NULL');
     });
 
+    it('should reject empty string as table name', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: '',
+        columns: {
+          key: 'key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid table name');
+    });
+
+    it('should reject empty string as column name', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage_cache',
+        columns: {
+          key: '',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid key column name');
+    });
+
+    it('should reject identifier starting with number', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: '123_storage',
+        columns: {
+          key: 'key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid table name');
+    });
+
+    it('should reject column name starting with number', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage_cache',
+        columns: {
+          key: '1key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid key column name');
+    });
+
+    it('should reject identifier with only special characters', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: '!!!',
+        columns: {
+          key: 'key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid table name');
+    });
+
+    it('should reject identifier with spaces', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage cache',
+        columns: {
+          key: 'key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid table name');
+    });
+
+    it('should reject identifier with hyphens', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage-cache',
+        columns: {
+          key: 'key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid table name');
+    });
+
+    it('should accept identifier starting with underscore', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: '_storage_cache',
+        columns: {
+          key: '_key',
+          value: '_value'
+        }
+      };
+      
+      const sql = generateNuvexSchemaSQL(schema);
+      
+      expect(sql).toContain('CREATE TABLE IF NOT EXISTS _storage_cache');
+      expect(sql).toContain('_key VARCHAR(512) NOT NULL UNIQUE');
+      expect(sql).toContain('_value JSONB NOT NULL');
+    });
+
     it('should generate custom schema SQL for Telegram bot', () => {
       const schema: PostgresSchemaConfig = {
         tableName: 'storage_cache',

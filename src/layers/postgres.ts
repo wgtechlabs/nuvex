@@ -152,9 +152,9 @@ export class PostgresStorage implements StorageLayerInterface {
     // Extract schema configuration with defaults
     // Note: Schema is only extracted from config objects, not from existing Pool instances
     const schema = this.ownsPool ? config.schema : undefined;
-    this.tableName = schema?.tableName || 'nuvex_storage';
-    this.keyColumn = schema?.columns?.key || 'nuvex_key';
-    this.valueColumn = schema?.columns?.value || 'nuvex_data';
+    this.tableName = schema?.tableName ?? 'nuvex_storage';
+    this.keyColumn = schema?.columns?.key ?? 'nuvex_key';
+    this.valueColumn = schema?.columns?.value ?? 'nuvex_data';
     
     // Validate all identifiers to prevent SQL injection
     validateSQLIdentifier(this.tableName, 'table name');

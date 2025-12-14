@@ -29,7 +29,7 @@ import type { PostgresSchemaConfig } from '../types/index.js';
  * @since 1.0.0
  */
 export function validateSQLIdentifier(identifier: string, name: string): void {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
+  if (!identifier || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
     throw new Error(
       `Invalid ${name}: "${identifier}". SQL identifiers must start with a letter or underscore and contain only alphanumeric characters and underscores.`
     );
@@ -44,9 +44,9 @@ export function validateSQLIdentifier(identifier: string, name: string): void {
  * @throws {Error} If table or column names contain invalid characters
  */
 export function generateNuvexSchemaSQL(schema?: PostgresSchemaConfig): string {
-  const tableName = schema?.tableName || 'nuvex_storage';
-  const keyColumn = schema?.columns?.key || 'nuvex_key';
-  const valueColumn = schema?.columns?.value || 'nuvex_data';
+  const tableName = schema?.tableName ?? 'nuvex_storage';
+  const keyColumn = schema?.columns?.key ?? 'nuvex_key';
+  const valueColumn = schema?.columns?.value ?? 'nuvex_data';
   
   // Validate all identifiers to prevent SQL injection
   validateSQLIdentifier(tableName, 'table name');
