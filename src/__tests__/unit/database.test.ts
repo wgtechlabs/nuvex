@@ -30,8 +30,8 @@ describe('Database Utilities', () => {
     it('should contain the complete schema definition', () => {
       expect(NUVEX_SCHEMA_SQL).toContain('CREATE TABLE IF NOT EXISTS nuvex_storage');
       expect(NUVEX_SCHEMA_SQL).toContain('id SERIAL PRIMARY KEY');
-      expect(NUVEX_SCHEMA_SQL).toContain('key VARCHAR(512) NOT NULL UNIQUE');
-      expect(NUVEX_SCHEMA_SQL).toContain('value JSONB NOT NULL');
+      expect(NUVEX_SCHEMA_SQL).toContain('nuvex_key VARCHAR(512) NOT NULL UNIQUE');
+      expect(NUVEX_SCHEMA_SQL).toContain('nuvex_data JSONB NOT NULL');
       expect(NUVEX_SCHEMA_SQL).toContain('expires_at TIMESTAMP WITH TIME ZONE');
       expect(NUVEX_SCHEMA_SQL).toContain('idx_nuvex_storage_expires_at');
       expect(NUVEX_SCHEMA_SQL).toContain('update_nuvex_storage_updated_at');
