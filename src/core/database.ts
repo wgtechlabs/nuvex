@@ -13,15 +13,37 @@ import type { Pool as PoolType } from 'pg';
 import type { PostgresSchemaConfig } from '../types/index.js';
 
 /**
+ * Validate SQL identifier to prevent SQL injection
+ * Ensures the identifier contains only alphanumeric characters and underscores
+ * 
+ * @param identifier - SQL identifier to validate
+ * @param name - Name of the identifier for error messages
+ * @throws {Error} If identifier contains invalid characters
+ */
+function validateSQLIdentifier(identifier: string, name: string): void {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
+    throw new Error(
+      `Invalid ${name}: "${identifier}". SQL identifiers must start with a letter or underscore and contain only alphanumeric characters and underscores.`
+    );
+  }
+}
+
+/**
  * Generate SQL schema for Nuvex storage with configurable table and column names
  * 
  * @param schema - Optional schema configuration for custom table/column names
  * @returns SQL string for creating the schema
+ * @throws {Error} If table or column names contain invalid characters
  */
 export function generateNuvexSchemaSQL(schema?: PostgresSchemaConfig): string {
   const tableName = schema?.tableName || 'nuvex_storage';
   const keyColumn = schema?.columns?.key || 'nuvex_key';
   const valueColumn = schema?.columns?.value || 'nuvex_data';
+  
+  // Validate all identifiers to prevent SQL injection
+  validateSQLIdentifier(tableName, 'table name');
+  validateSQLIdentifier(keyColumn, 'key column name');
+  validateSQLIdentifier(valueColumn, 'value column name');
   
   return `
 -- Nuvex storage table for PostgreSQL layer
@@ -184,6 +206,8 @@ export async function setupNuvexSchema(
 async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: PostgresSchemaConfig): Promise<void> {
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
+    validateSQLIdentifier(tableName, 'table name');
+    
     // Generate a unique job name per tenant/context
     const jobName = tenantId ? `nuvex-cleanup-${tenantId}` : `nuvex-cleanup-${Date.now()}`;
     // This requires pg_cron extension and superuser privileges
@@ -223,6 +247,8 @@ async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: Postgre
 export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchemaConfig): Promise<number> {
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
+    validateSQLIdentifier(tableName, 'table name');
+    
     const result = await db.query(`SELECT cleanup_expired_${tableName}() as deleted_count;`);
     return result.rows[0]?.deleted_count || 0;
   } catch (error) {
@@ -255,6 +281,8 @@ export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchem
 export async function dropNuvexSchema(db: PoolType, schema?: PostgresSchemaConfig): Promise<void> {
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
+    validateSQLIdentifier(tableName, 'table name');
+    
     await db.query(`
       DROP TRIGGER IF EXISTS trigger_update_${tableName}_updated_at ON ${tableName};
       DROP FUNCTION IF EXISTS update_${tableName}_updated_at();

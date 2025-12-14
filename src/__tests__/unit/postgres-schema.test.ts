@@ -21,6 +21,46 @@ describe('PostgreSQL Configurable Schema', () => {
       expect(sql).toContain('CREATE OR REPLACE FUNCTION cleanup_expired_nuvex_storage()');
     });
 
+    it('should reject invalid table names with SQL injection attempts', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage_cache; DROP TABLE users; --',
+        columns: {
+          key: 'key',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid table name');
+    });
+
+    it('should reject invalid column names with SQL injection attempts', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage_cache',
+        columns: {
+          key: 'key\' OR 1=1 --',
+          value: 'value'
+        }
+      };
+      
+      expect(() => generateNuvexSchemaSQL(schema)).toThrow('Invalid key column name');
+    });
+
+    it('should accept valid identifiers with underscores and numbers', () => {
+      const schema: PostgresSchemaConfig = {
+        tableName: 'storage_cache_v2',
+        columns: {
+          key: 'cache_key_123',
+          value: 'data_value_v1'
+        }
+      };
+      
+      const sql = generateNuvexSchemaSQL(schema);
+      
+      expect(sql).toContain('CREATE TABLE IF NOT EXISTS storage_cache_v2');
+      expect(sql).toContain('cache_key_123 VARCHAR(512) NOT NULL UNIQUE');
+      expect(sql).toContain('data_value_v1 JSONB NOT NULL');
+    });
+
     it('should generate custom schema SQL for Telegram bot', () => {
       const schema: PostgresSchemaConfig = {
         tableName: 'storage_cache',

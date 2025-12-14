@@ -113,20 +113,27 @@ export class PostgresStorage implements StorageLayerInterface {
    * Accepts either a PostgreSQL configuration object or an existing Pool instance.
    * If a Pool is provided, the caller is responsible for managing its lifecycle.
    * 
+   * Schema configuration is extracted from the config object when creating a new pool.
+   * When using an existing pool, schema defaults to standard Nuvex naming.
+   * 
    * @param config - PostgreSQL configuration or existing Pool instance
    * @param logger - Optional logger for debugging
    * 
    * @example
    * ```typescript
-   * // With configuration
+   * // With configuration (supports schema customization)
    * const postgres = new PostgresStorage({
    *   host: 'localhost',
    *   database: 'myapp',
    *   user: 'postgres',
-   *   password: 'password'
+   *   password: 'password',
+   *   schema: {
+   *     tableName: 'storage_cache',
+   *     columns: { key: 'key', value: 'value' }
+   *   }
    * });
    * 
-   * // With existing pool
+   * // With existing pool (uses default schema)
    * const existingPool = new Pool({ ... });
    * const postgres = new PostgresStorage(existingPool);
    * ```
@@ -142,6 +149,7 @@ export class PostgresStorage implements StorageLayerInterface {
     this.ownsPool = !('query' in config && typeof config.query === 'function');
     
     // Extract schema configuration with defaults
+    // Note: Schema is only extracted from config objects, not from existing Pool instances
     const schema = this.ownsPool ? config.schema : undefined;
     this.tableName = schema?.tableName || 'nuvex_storage';
     this.keyColumn = schema?.columns?.key || 'nuvex_key';
