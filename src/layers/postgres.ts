@@ -122,7 +122,8 @@ export class PostgresStorage implements StorageLayerInterface {
    * const postgres = new PostgresStorage(existingPool);
    * ```
    */
-  constructor(config: PoolType | Record<string, unknown>, logger: Logger | null = null) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(config: any, logger: Logger | null = null) {
     this.config = config;
     this.pool = null;
     this.connected = false;
