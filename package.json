@@ -28,7 +28,8 @@
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",    "lint": "eslint src/**/*.ts",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "lint:security": "eslint src/**/*.ts --config eslint.security.config.js",
     "secure:code": "snyk code test --org=wgtechlabs",
@@ -68,8 +69,8 @@
   },
   "dependencies": {
     "global": "^4.4.0",
-    "pg": "^8.11.0",
-    "redis": "^4.6.0"
+    "pg": "^8.13.0",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "@types/eslint-plugin-security": "^3",
@@ -81,8 +82,8 @@
     "eslint": "^9.29.0",
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-security-node": "^1.1.4",
-    "jest": "^29.6.0",
-    "rimraf": "^5.0.0",
+    "jest": "^29.7.0",
+    "rimraf": "^6.0.0",
     "snyk": "^1.1297.3",
     "ts-jest": "^29.4.0",
     "typedoc": "^0.25.13",
