@@ -34,11 +34,11 @@
     "lint:security": "eslint src/**/*.ts --config eslint.security.config.js",
     "secure:code": "snyk code test --org=wgtechlabs",
     "secure:scan": "snyk test --org=wgtechlabs",
-    "secure": "yarn lint:security && yarn secure:scan",
+    "secure": "pnpm lint:security && pnpm secure:scan",
     "docs": "npm run build:docs && echo 'Documentation generated in ./docs/'",
-    "validate": "yarn lint && yarn test && yarn build",
-    "validate:full": "yarn install && yarn lint && yarn test:coverage && yarn build && yarn docs",
-    "prepublishOnly": "yarn validate"
+    "validate": "pnpm lint && pnpm test && pnpm build",
+    "validate:full": "pnpm install && pnpm lint && pnpm test:coverage && pnpm build && pnpm docs",
+    "prepublishOnly": "pnpm validate"
   },
   "keywords": [
     "storage",
@@ -62,10 +62,10 @@
     "url": "https://github.com/wgtechlabs/nuvex/issues"
   },
   "homepage": "https://github.com/wgtechlabs/nuvex#readme",
-  "packageManager": "yarn@4.2.2",
+  "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": ">=20.0.0",
-    "yarn": ">=1.22.0"
+    "pnpm": ">=9.0.0"
   },
   "dependencies": {
     "global": "^4.4.0",
