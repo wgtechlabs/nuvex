@@ -19,8 +19,16 @@ import type { PostgresSchemaConfig } from '../types/index.js';
  * @param identifier - SQL identifier to validate
  * @param name - Name of the identifier for error messages
  * @throws {Error} If identifier contains invalid characters
+ * 
+ * @example
+ * ```typescript
+ * validateSQLIdentifier('my_table_123', 'table name'); // OK
+ * validateSQLIdentifier('users; DROP TABLE', 'table name'); // throws Error
+ * ```
+ * 
+ * @since 1.0.0
  */
-function validateSQLIdentifier(identifier: string, name: string): void {
+export function validateSQLIdentifier(identifier: string, name: string): void {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
     throw new Error(
       `Invalid ${name}: "${identifier}". SQL identifiers must start with a letter or underscore and contain only alphanumeric characters and underscores.`

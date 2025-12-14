@@ -262,5 +262,37 @@ describe('PostgreSQL Configurable Schema', () => {
       expect((storage as any).keyColumn).toBe('cache_key');
       expect((storage as any).valueColumn).toBe('data');
     });
+
+    it('should reject invalid table name in constructor', () => {
+      const config = {
+        host: 'localhost',
+        port: 5432,
+        database: 'test',
+        user: 'test',
+        password: 'test',
+        schema: {
+          tableName: 'storage; DROP TABLE users; --'
+        }
+      };
+      
+      expect(() => new PostgresStorage(config)).toThrow('Invalid table name');
+    });
+
+    it('should reject invalid column name in constructor', () => {
+      const config = {
+        host: 'localhost',
+        port: 5432,
+        database: 'test',
+        user: 'test',
+        password: 'test',
+        schema: {
+          columns: {
+            key: 'key\' OR 1=1 --'
+          }
+        }
+      };
+      
+      expect(() => new PostgresStorage(config)).toThrow('Invalid key column name');
+    });
   });
 });
