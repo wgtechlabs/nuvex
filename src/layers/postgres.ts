@@ -98,6 +98,15 @@ export class PostgresStorage implements StorageLayerInterface {
   /** Whether we created the pool (vs. received existing one) */
   private readonly ownsPool: boolean;
 
+  /** Table name for storage */
+  private readonly tableName: string;
+  
+  /** Key column name */
+  private readonly keyColumn: string;
+  
+  /** Value/data column name */
+  private readonly valueColumn: string;
+
   /**
    * Creates a new PostgresStorage instance
    * 
@@ -131,6 +140,12 @@ export class PostgresStorage implements StorageLayerInterface {
     
     // Check if config is already a Pool instance
     this.ownsPool = !('query' in config && typeof config.query === 'function');
+    
+    // Extract schema configuration with defaults
+    const schema = this.ownsPool ? config.schema : undefined;
+    this.tableName = schema?.tableName || 'nuvex_storage';
+    this.keyColumn = schema?.columns?.key || 'nuvex_key';
+    this.valueColumn = schema?.columns?.value || 'nuvex_data';
   }
 
   /**
@@ -219,7 +234,7 @@ export class PostgresStorage implements StorageLayerInterface {
 
     try {
       const result = await this.pool.query(
-        'SELECT value FROM nuvex_storage WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())',
+        `SELECT ${this.valueColumn} FROM ${this.tableName} WHERE ${this.keyColumn} = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
         [key]
       );
 
@@ -228,7 +243,7 @@ export class PostgresStorage implements StorageLayerInterface {
       }
 
       // Value is already parsed by PostgreSQL JSONB type
-      return result.rows[0].value;
+      return result.rows[0][this.valueColumn];
     } catch (error) {
       // Table might not exist yet, that's okay
       this.log('debug', `PostgreSQL L3: Error getting key: ${key}`, { 
@@ -270,10 +285,10 @@ export class PostgresStorage implements StorageLayerInterface {
       const expiresAt = ttlSeconds ? new Date(Date.now() + (ttlSeconds * 1000)) : null;
       
       await this.pool.query(
-        `INSERT INTO nuvex_storage (key, value, expires_at) 
+        `INSERT INTO ${this.tableName} (${this.keyColumn}, ${this.valueColumn}, expires_at) 
          VALUES ($1, $2, $3)
-         ON CONFLICT (key) 
-         DO UPDATE SET value = $2, expires_at = $3, updated_at = NOW()`,
+         ON CONFLICT (${this.keyColumn}) 
+         DO UPDATE SET ${this.valueColumn} = $2, expires_at = $3, updated_at = NOW()`,
         [key, JSON.stringify(value), expiresAt]
       );
     } catch (error) {
@@ -303,7 +318,7 @@ export class PostgresStorage implements StorageLayerInterface {
     }
 
     try {
-      await this.pool.query('DELETE FROM nuvex_storage WHERE key = $1', [key]);
+      await this.pool.query(`DELETE FROM ${this.tableName} WHERE ${this.keyColumn} = $1`, [key]);
     } catch (error) {
       this.log('error', `PostgreSQL L3: Error deleting key: ${key}`, { 
         error: error instanceof Error ? error.message : String(error) 
@@ -333,7 +348,7 @@ export class PostgresStorage implements StorageLayerInterface {
 
     try {
       const result = await this.pool.query(
-        'SELECT 1 FROM nuvex_storage WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())',
+        `SELECT 1 FROM ${this.tableName} WHERE ${this.keyColumn} = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
         [key]
       );
       
@@ -363,7 +378,7 @@ export class PostgresStorage implements StorageLayerInterface {
     }
 
     try {
-      await this.pool.query('DELETE FROM nuvex_storage');
+      await this.pool.query(`DELETE FROM ${this.tableName}`);
       this.log('info', 'PostgreSQL L3: All data cleared');
     } catch (error) {
       this.log('error', 'PostgreSQL L3: Error clearing data', { 

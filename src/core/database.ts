@@ -10,32 +10,44 @@
  */
 
 import type { Pool as PoolType } from 'pg';
+import type { PostgresSchemaConfig } from '../types/index.js';
 
-export const NUVEX_SCHEMA_SQL = `
+/**
+ * Generate SQL schema for Nuvex storage with configurable table and column names
+ * 
+ * @param schema - Optional schema configuration for custom table/column names
+ * @returns SQL string for creating the schema
+ */
+export function generateNuvexSchemaSQL(schema?: PostgresSchemaConfig): string {
+  const tableName = schema?.tableName || 'nuvex_storage';
+  const keyColumn = schema?.columns?.key || 'nuvex_key';
+  const valueColumn = schema?.columns?.value || 'nuvex_data';
+  
+  return `
 -- Nuvex storage table for PostgreSQL layer
-CREATE TABLE IF NOT EXISTS nuvex_storage (
+CREATE TABLE IF NOT EXISTS ${tableName} (
   id SERIAL PRIMARY KEY,
-  key VARCHAR(512) NOT NULL UNIQUE,
-  value JSONB NOT NULL,
+  ${keyColumn} VARCHAR(512) NOT NULL UNIQUE,
+  ${valueColumn} JSONB NOT NULL,
   expires_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Index for expiration cleanup
-CREATE INDEX IF NOT EXISTS idx_nuvex_storage_expires_at 
-ON nuvex_storage(expires_at) 
+CREATE INDEX IF NOT EXISTS idx_${tableName}_expires_at 
+ON ${tableName}(expires_at) 
 WHERE expires_at IS NOT NULL;
 
 -- Ensure pg_trgm extension is available for GIN index
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Index for key pattern searches
-CREATE INDEX IF NOT EXISTS idx_nuvex_storage_key_pattern 
-ON nuvex_storage USING gin(key gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_${tableName}_key_pattern 
+ON ${tableName} USING gin(${keyColumn} gin_trgm_ops);
 
 -- Function to auto-update updated_at
-CREATE OR REPLACE FUNCTION update_nuvex_storage_updated_at()
+CREATE OR REPLACE FUNCTION update_${tableName}_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -44,19 +56,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for auto-updating updated_at
-DROP TRIGGER IF EXISTS trigger_update_nuvex_storage_updated_at ON nuvex_storage;
-CREATE TRIGGER trigger_update_nuvex_storage_updated_at
-  BEFORE UPDATE ON nuvex_storage
+DROP TRIGGER IF EXISTS trigger_update_${tableName}_updated_at ON ${tableName};
+CREATE TRIGGER trigger_update_${tableName}_updated_at
+  BEFORE UPDATE ON ${tableName}
   FOR EACH ROW
-  EXECUTE FUNCTION update_nuvex_storage_updated_at();
+  EXECUTE FUNCTION update_${tableName}_updated_at();
 
 -- Function to clean up expired entries
-CREATE OR REPLACE FUNCTION cleanup_expired_nuvex_storage()
+CREATE OR REPLACE FUNCTION cleanup_expired_${tableName}()
 RETURNS INTEGER AS $$
 DECLARE
   deleted_count INTEGER;
 BEGIN
-  DELETE FROM nuvex_storage 
+  DELETE FROM ${tableName} 
   WHERE expires_at IS NOT NULL AND expires_at < NOW();
   
   GET DIAGNOSTICS deleted_count = ROW_COUNT;
@@ -64,12 +76,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 `;
+}
+
+export const NUVEX_SCHEMA_SQL = generateNuvexSchemaSQL();
 
 export interface SchemaSetupOptions {
   /** Enable trigram extension for advanced pattern matching (requires pg_trgm) */
   enableTrigram?: boolean; 
   /** Set up periodic cleanup job using pg_cron extension */
-  enableCleanupJob?: boolean; 
+  enableCleanupJob?: boolean;
+  /** Schema configuration for custom table/column names */
+  schema?: PostgresSchemaConfig;
 }
 
 /**
@@ -122,12 +139,15 @@ export async function setupNuvexSchema(
       await db.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
     }
     
+    // Generate schema SQL with custom table/column names if provided
+    const schemaSQL = options.schema ? generateNuvexSchemaSQL(options.schema) : NUVEX_SCHEMA_SQL;
+    
     // Execute main schema
-    await db.query(NUVEX_SCHEMA_SQL);
+    await db.query(schemaSQL);
     
     // Setup periodic cleanup job if requested
     if (options.enableCleanupJob) {
-      await setupCleanupJob(db);
+      await setupCleanupJob(db, undefined, options.schema);
     }
     
     console.log('Nuvex database schema setup completed successfully');
@@ -161,8 +181,9 @@ export async function setupNuvexSchema(
  * @requires pg_cron extension and superuser privileges
  * @since 1.0.0
  */
-async function setupCleanupJob(db: PoolType, tenantId?: string): Promise<void> {
+async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: PostgresSchemaConfig): Promise<void> {
   try {
+    const tableName = schema?.tableName || 'nuvex_storage';
     // Generate a unique job name per tenant/context
     const jobName = tenantId ? `nuvex-cleanup-${tenantId}` : `nuvex-cleanup-${Date.now()}`;
     // This requires pg_cron extension and superuser privileges
@@ -170,7 +191,7 @@ async function setupCleanupJob(db: PoolType, tenantId?: string): Promise<void> {
       SELECT cron.schedule(
         $1,
         '0 2 * * *', -- Daily at 2 AM
-        'SELECT cleanup_expired_nuvex_storage();'
+        'SELECT cleanup_expired_${tableName}();'
       );
     `, [jobName]);
     console.log(`Nuvex cleanup cron job scheduled as '${jobName}'`);
@@ -199,9 +220,10 @@ async function setupCleanupJob(db: PoolType, tenantId?: string): Promise<void> {
  * 
  * @since 1.0.0
  */
-export async function cleanupExpiredEntries(db: PoolType): Promise<number> {
+export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchemaConfig): Promise<number> {
   try {
-    const result = await db.query('SELECT cleanup_expired_nuvex_storage() as deleted_count;');
+    const tableName = schema?.tableName || 'nuvex_storage';
+    const result = await db.query(`SELECT cleanup_expired_${tableName}() as deleted_count;`);
     return result.rows[0]?.deleted_count || 0;
   } catch (error) {
     console.error('Failed to cleanup expired entries:', error);
@@ -230,13 +252,14 @@ export async function cleanupExpiredEntries(db: PoolType): Promise<number> {
  * @warning This operation is irreversible and will cause permanent data loss
  * @since 1.0.0
  */
-export async function dropNuvexSchema(db: PoolType): Promise<void> {
+export async function dropNuvexSchema(db: PoolType, schema?: PostgresSchemaConfig): Promise<void> {
   try {
+    const tableName = schema?.tableName || 'nuvex_storage';
     await db.query(`
-      DROP TRIGGER IF EXISTS trigger_update_nuvex_storage_updated_at ON nuvex_storage;
-      DROP FUNCTION IF EXISTS update_nuvex_storage_updated_at();
-      DROP FUNCTION IF EXISTS cleanup_expired_nuvex_storage();
-      DROP TABLE IF EXISTS nuvex_storage CASCADE;
+      DROP TRIGGER IF EXISTS trigger_update_${tableName}_updated_at ON ${tableName};
+      DROP FUNCTION IF EXISTS update_${tableName}_updated_at();
+      DROP FUNCTION IF EXISTS cleanup_expired_${tableName}();
+      DROP TABLE IF EXISTS ${tableName} CASCADE;
     `);
     console.log('Nuvex database schema dropped successfully');
   } catch (error) {
