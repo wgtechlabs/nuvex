@@ -96,7 +96,7 @@ export class MemoryStorage implements StorageLayerInterface {
    * const memory = new MemoryStorage(10000, console);
    * ```
    */
-  constructor(maxSize: number = 10000, logger: Logger | null = null) {
+  constructor(maxSize = 10000, logger: Logger | null = null) {
     this.cache = new Map();
     this.maxSize = maxSize;
     this.logger = logger;

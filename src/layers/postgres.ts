@@ -122,7 +122,7 @@ export class PostgresStorage implements StorageLayerInterface {
    * const postgres = new PostgresStorage(existingPool);
    * ```
    */
-  constructor(config: any, logger: Logger | null = null) {
+  constructor(config: PoolType | Record<string, unknown>, logger: Logger | null = null) {
     this.config = config;
     this.pool = null;
     this.connected = false;
