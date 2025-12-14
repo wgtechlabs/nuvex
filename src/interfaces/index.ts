@@ -186,6 +186,68 @@ export interface DatabaseConnection {
   transaction<T>(callback: (client: any) => Promise<T>): Promise<T>;
 }
 
+// ===== Storage Layer Interface =====
+
+/**
+ * Storage Layer interface for modular storage implementations
+ * 
+ * Defines the contract that all storage layer implementations must follow.
+ * Each layer (Memory, Redis, PostgreSQL) implements this interface to provide
+ * consistent operations across the storage hierarchy.
+ * 
+ * This interface supports:
+ * - Basic CRUD operations (get, set, delete)
+ * - Existence checks
+ * - Optional clear operation for cache layers
+ * - Health check via ping() method
+ * 
+ * @interface StorageLayerInterface
+ * @since 1.0.0
+ */
+export interface StorageLayerInterface {
+  /**
+   * Retrieve a value from this storage layer
+   * @param key - The key to retrieve
+   * @returns Promise resolving to the value or null if not found
+   */
+  get(key: string): Promise<unknown>;
+  
+  /**
+   * Store a value in this storage layer
+   * @param key - The key to store
+   * @param value - The value to store
+   * @param ttlSeconds - Optional TTL in seconds
+   * @returns Promise resolving when the operation completes
+   */
+  set(key: string, value: unknown, ttlSeconds?: number): Promise<void>;
+  
+  /**
+   * Delete a value from this storage layer
+   * @param key - The key to delete
+   * @returns Promise resolving when the operation completes
+   */
+  delete(key: string): Promise<void>;
+  
+  /**
+   * Check if a key exists in this storage layer
+   * @param key - The key to check
+   * @returns Promise resolving to true if the key exists
+   */
+  exists(key: string): Promise<boolean>;
+  
+  /**
+   * Clear all data from this storage layer (optional for some layers)
+   * @returns Promise resolving when the operation completes
+   */
+  clear?(): Promise<void>;
+  
+  /**
+   * Health check for this storage layer
+   * @returns Promise resolving to true if the layer is healthy and operational
+   */
+  ping(): Promise<boolean>;
+}
+
 // ===== Cache Interface =====
 
 export interface CacheLayer {
