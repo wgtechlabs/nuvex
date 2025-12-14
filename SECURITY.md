@@ -36,7 +36,7 @@ Alternatively, you can email us at **[security@wgtechlabs.com](mailto:security@w
 
 ## 🛡️ Supported Versions
 
-We provide security updates for the following versions. If you're using an unsupported version, please upgrade to receive security patches. 
+We provide security updates for the following versions. If you're using an unsupported version, please upgrade to receive security patches.
 
 | Version | Supported          |
 | ------- | ------------------ |
