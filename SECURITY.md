@@ -6,7 +6,7 @@ We take security seriously. If you discover a security vulnerability, please rep
 
 ### Private Vulnerability Reporting (Recommended)
 
-This repository has **private vulnerability reporting** enabled. You can securely report vulnerabilities directly through GitHub: 
+This repository has **private vulnerability reporting** enabled. You can securely report vulnerabilities directly through GitHub:
 
 1. Navigate to the [**Security**](../../security) tab
 2. Click [**Advisories**](../../security/advisories)
