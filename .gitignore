@@ -149,3 +149,6 @@ performance-logs/
 # Project-specific backup files
 # -----------------------------------------------------------------------------
 nuvex-backups/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.github/instructions/snyk_rules.instructions.md
