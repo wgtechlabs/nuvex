@@ -38,10 +38,10 @@ Alternatively, you can email us at **[security@wgtechlabs.com](mailto:security@w
 
 We provide security updates for the following versions. If you're using an unsupported version, please upgrade to receive security patches.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.x     | ✅ Yes             |
-| < 1.0   | ❌ No              |
+| Version  | Supported          |
+| -------- | ------------------ |
+| >= 1.0.0 | ✅ Yes             |
+| < 1.0.0  | ❌ No              |
 
 ## 🔐 Security Best Practices
 
