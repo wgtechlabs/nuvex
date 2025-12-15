@@ -116,6 +116,68 @@ const config = {
 };
 ```
 
+#### PostgreSQL Schema Configuration
+
+Nuvex uses strongly branded table and column names by default (`nuvex_storage`, `nuvex_key`, `nuvex_data`). For backwards compatibility with existing applications, you can customize these names:
+
+```typescript
+// Default configuration (recommended for new apps)
+const storage = await NuvexClient.initialize({
+  postgres: {
+    host: 'localhost',
+    port: 5432,
+    database: 'myapp',
+    user: 'postgres',
+    password: 'password'
+    // Uses: table 'nuvex_storage', columns 'nuvex_key' and 'nuvex_data'
+  }
+});
+
+// Custom configuration for Telegram bot compatibility
+const storage = await NuvexClient.initialize({
+  postgres: {
+    host: 'localhost',
+    port: 5432,
+    database: 'telegram_bot',
+    user: 'postgres',
+    password: 'password',
+    schema: {
+      tableName: 'storage_cache',
+      columns: {
+        key: 'key',
+        value: 'value'
+      }
+    }
+  }
+});
+
+// Custom configuration for Discord bot compatibility
+const storage = await NuvexClient.initialize({
+  postgres: {
+    host: 'localhost',
+    port: 5432,
+    database: 'discord_bot',
+    user: 'postgres',
+    password: 'password',
+    schema: {
+      tableName: 'storage_cache',
+      columns: {
+        key: 'cache_key',
+        value: 'data'
+      }
+    }
+  }
+});
+```
+
+**Schema Configuration Reference:**
+
+| App           | Table           | Key Column     | Data Column   |
+|---------------|-----------------|---------------|---------------|
+| **Nuvex** (default) | nuvex_storage   | nuvex_key     | nuvex_data    |
+| Telegram Bot  | storage_cache   | key           | value         |
+| Discord Bot   | storage_cache   | cache_key     | data          |
+
 ### API Reference
 
 ```typescript

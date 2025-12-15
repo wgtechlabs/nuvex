@@ -23,11 +23,6 @@
  * @version 1.0.0
  * @since 2025
  */
-import { createClient, RedisClientType } from 'redis';
-import pkg from 'pg';
-const { Pool } = pkg;
-import type { Pool as PoolType } from 'pg';
-
 import type { 
   NuvexConfig, 
   StorageOptions, 
@@ -40,6 +35,7 @@ import type {
 } from '../types/index.js';
 import { StorageLayer } from '../types/index.js';
 import type { Storage, Logger } from '../interfaces/index.js';
+import { MemoryStorage, RedisStorage, PostgresStorage } from '../layers/index.js';
 
 // Node.js global types
 declare global {
@@ -169,14 +165,13 @@ declare global {
  * @category Core
  */
 export class StorageEngine implements Storage {
-  private memoryCache: Map<string, unknown>;
-  private memoryCacheTTL: Map<string, number>;
-  private memoryTTL: number;
-  private maxMemorySize: number;
-  private redisConfig: { url?: string; ttl: number };
-  private redisClient: RedisClientType | null;
-  private dbConfig: NuvexConfig['postgres'] | PoolType;
-  private db: PoolType | null;
+  // Modular storage layers (new architecture)
+  private l1Memory: MemoryStorage;
+  private l2Redis: RedisStorage | null;
+  private l3Postgres: PostgresStorage | null;
+  
+  // Configuration and state
+  private config: NuvexConfig;
   private connected: boolean;
   private cleanupInterval: number | null;
   private logger: Logger | null;
@@ -204,29 +199,26 @@ export class StorageEngine implements Storage {
    * @since 1.0.0
    */
   constructor(config: NuvexConfig) {
-    // Layer 1: Memory cache with TTL
-    this.memoryCache = new Map();
-    this.memoryCacheTTL = new Map();
-    this.memoryTTL = config.memory?.ttl || 24 * 60 * 60 * 1000; // 24 hours default
-    this.maxMemorySize = config.memory?.maxSize || 10000; // 10k entries default
-    
-    // Layer 2: Redis configuration
-    this.redisConfig = {
-      url: config.redis?.url || '',
-      ttl: config.redis?.ttl || 3 * 24 * 60 * 60 // 3 days default
-    };
-    this.redisClient = null;
-    
-    // Layer 3: PostgreSQL configuration
-    this.dbConfig = config.postgres;
-    this.db = null;
-    
-    // Connection status
+    this.config = config;
     this.connected = false;
     this.cleanupInterval = null;
     
     // Logging setup
     this.logger = config.logging?.enabled ? (config.logging.logger || null) : null;
+    
+    // Layer 1: Memory storage with LRU eviction
+    const maxMemorySize = config.memory?.maxSize || 10000; // 10k entries default
+    this.l1Memory = new MemoryStorage(maxMemorySize, this.logger);
+    
+    // Layer 2: Redis storage (optional)
+    this.l2Redis = config.redis?.url 
+      ? new RedisStorage(config.redis.url, this.logger)
+      : null;
+    
+    // Layer 3: PostgreSQL storage
+    this.l3Postgres = config.postgres
+      ? new PostgresStorage(config.postgres, this.logger)
+      : null;
     
     // Metrics initialization
     this.metrics = {
@@ -271,34 +263,29 @@ export class StorageEngine implements Storage {
    */
   async connect(): Promise<void> {
     try {
-      // Connect to Redis (optional)
-      if (this.redisConfig.url) {
+      // Connect to Redis (L2) - optional, gracefully degrade if unavailable
+      if (this.l2Redis) {
         try {
-          this.redisClient = createClient({ url: this.redisConfig.url });
-          await this.redisClient.connect();
-          this.log('info', 'Redis connected for Nuvex storage');
-        } catch (_error) {
-          this.log('warn', 'Redis not available, using Memory + PostgreSQL only');
-          this.redisClient = null;
+          await this.l2Redis.connect();
+          this.log('info', 'Redis L2 connected for Nuvex storage');
+        } catch (error) {
+          this.log('warn', 'Redis L2 not available, using Memory + PostgreSQL only', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          this.l2Redis = null;
         }
       } else {
-        this.log('info', 'Redis URL not provided, using Memory + PostgreSQL only');
+        this.log('info', 'Redis L2 URL not provided, using Memory + PostgreSQL only');
       }
-        // Connect to PostgreSQL
-      if (this.dbConfig) {
-        // If dbConfig is already a Pool instance, use it directly
-        if ('query' in this.dbConfig && typeof this.dbConfig.query === 'function') {
-          this.db = this.dbConfig as PoolType;        } else {
-          // Otherwise create a new Pool with the config
-          this.db = new Pool(this.dbConfig as NuvexConfig['postgres']);
-        }
-        if (this.db) {
-          await this.db.query('SELECT 1'); // Test connection
-        }
-        this.log('info', 'PostgreSQL connected for Nuvex storage');
+      
+      // Connect to PostgreSQL (L3) - critical for data persistence
+      if (this.l3Postgres) {
+        await this.l3Postgres.connect();
+        this.log('info', 'PostgreSQL L3 connected for Nuvex storage');
       }
-        this.connected = true;
-      this.log('info', 'Nuvex StorageEngine initialized with multi-layer architecture');
+      
+      this.connected = true;
+      this.log('info', 'Nuvex StorageEngine initialized with 3-layer architecture');
     } catch (error) {
       const err = error as Error;
       this.log('error', 'Nuvex StorageEngine connection failed', {
@@ -310,19 +297,23 @@ export class StorageEngine implements Storage {
   }
   
   async disconnect(): Promise<void> {
-    if (this.redisClient) {
-      await this.redisClient.quit();
-    }    // Only close the database pool if we created it ourselves
-    // If it was passed in as an existing pool, let the caller manage it
-    if (this.db && this.dbConfig && !('query' in this.dbConfig)) {
-      await this.db.end();
+    // Disconnect from Redis (L2)
+    if (this.l2Redis) {
+      await this.l2Redis.disconnect();
     }
     
+    // Disconnect from PostgreSQL (L3)
+    if (this.l3Postgres) {
+      await this.l3Postgres.disconnect();
+    }
+    
+    // Stop memory cleanup interval
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
-      this.connected = false;
+    
+    this.connected = false;
     this.log('info', 'Nuvex StorageEngine disconnected');
   }
   
@@ -370,57 +361,68 @@ export class StorageEngine implements Storage {
     this.metrics.totalOperations++;
     
     try {
-      // Skip cache if requested
-      if (options?.skipCache) {
-        return await this.getFromPostgres<T>(key);
+      // Default TTL configuration
+      const defaultTTL = this.config.redis?.ttl || 3 * 24 * 60 * 60; // 3 days in seconds
+      
+      // Skip cache if requested - go directly to L3
+      if (options?.skipCache && this.l3Postgres) {
+        const value = await this.l3Postgres.get(key);
+        this.updateResponseTime(Date.now() - startTime);
+        return value as T | null;
       }
       
       // Specific layer requested
       if (options?.layer) {
+        let value: unknown = null;
         switch (options.layer) {
           case StorageLayer.MEMORY:
-            return this.getFromMemory<T>(key);
+            value = await this.l1Memory.get(key);
+            break;
           case StorageLayer.REDIS:
-            return await this.getFromRedis<T>(key);
+            value = this.l2Redis ? await this.l2Redis.get(key) : null;
+            break;
           case StorageLayer.POSTGRES:
-            return await this.getFromPostgres<T>(key);
+            value = this.l3Postgres ? await this.l3Postgres.get(key) : null;
+            break;
         }
+        this.updateResponseTime(Date.now() - startTime);
+        return value as T | null;
       }
       
-      // Layer 1: Check memory cache first
-      const memoryCached = this.getFromMemory<T>(key);
-      if (memoryCached !== null) {
+      // Layer 1: Check memory cache first (fastest)
+      let data = await this.l1Memory.get(key);
+      if (data !== null) {
         this.metrics.memoryHits++;
         this.updateResponseTime(Date.now() - startTime);
-        return memoryCached;
+        return data as T;
       }
       this.metrics.memoryMisses++;
       
-      // Layer 2: Check Redis cache
-      if (this.redisClient) {
-        const redisCached = await this.getFromRedis<T>(key);
-        if (redisCached !== null) {
+      // Layer 2: Check Redis cache (fast distributed cache)
+      if (this.l2Redis) {
+        data = await this.l2Redis.get(key);
+        if (data !== null) {
           this.metrics.redisHits++;
-          // Store back in memory for next time
-          this.setInMemory(key, redisCached);
+          // Warm L1 cache for next access
+          await this.l1Memory.set(key, data, defaultTTL);
           this.updateResponseTime(Date.now() - startTime);
-          return redisCached;
+          return data as T;
         }
         this.metrics.redisMisses++;
       }
       
-      // Layer 3: Check PostgreSQL
-      if (this.db) {
-        const pgValue = await this.getFromPostgres<T>(key);
-        if (pgValue !== null) {
+      // Layer 3: Check PostgreSQL (persistent storage, source of truth)
+      if (this.l3Postgres) {
+        data = await this.l3Postgres.get(key);
+        if (data !== null) {
           this.metrics.postgresHits++;
-          // Store back in Redis and memory for next time
-          if (this.redisClient) {
-            await this.redisClient.setEx(key, this.redisConfig.ttl, JSON.stringify(pgValue));
-          }
-          this.setInMemory(key, pgValue);
+          // Warm both L1 and L2 caches for future access
+          await Promise.allSettled([
+            this.l1Memory.set(key, data, defaultTTL),
+            this.l2Redis ? this.l2Redis.set(key, data, defaultTTL) : Promise.resolve()
+          ]);
           this.updateResponseTime(Date.now() - startTime);
-          return pgValue;
+          return data as T;
         }
         this.metrics.postgresMisses++;
       }
@@ -441,8 +443,39 @@ export class StorageEngine implements Storage {
   }
   
   /**
-   * Set value in storage layers
-   */  async set<T = unknown>(key: string, value: T, options: StorageOptions = {}): Promise<boolean> {
+   * Set value in storage layers using L3-first write strategy
+   * 
+   * **L3-First Write Strategy:**
+   * 1. Write to PostgreSQL (L3) first as source of truth
+   * 2. If L3 write succeeds, warm caches (L1, L2) using Promise.allSettled
+   * 3. Cache failures don't break the operation (graceful degradation)
+   * 
+   * **Error Handling:**
+   * - Returns `false` if L3 (PostgreSQL) write fails - operation is aborted
+   * - Returns `false` if engine is not connected
+   * - Returns `true` if L3 write succeeds (cache failures are tolerated)
+   * - For memory/Redis-only deployments (no L3), cache write success determines result
+   * 
+   * **Usage Recommendations:**
+   * ```typescript
+   * // Always check the return value for critical data
+   * const success = await engine.set('user:123', userData);
+   * if (!success) {
+   *   // Handle failure: retry, log, alert, or use fallback
+   *   console.error('Failed to persist user data');
+   *   throw new Error('Storage operation failed');
+   * }
+   * 
+   * // For non-critical data, you may proceed regardless
+   * await engine.set('cache:temp', tempData); // Fire and forget
+   * ```
+   * 
+   * @param key - The key to store
+   * @param value - The value to store
+   * @param options - Optional storage options (ttl, layer targeting)
+   * @returns Promise resolving to true if operation succeeded, false otherwise
+   */
+  async set<T = unknown>(key: string, value: T, options: StorageOptions = {}): Promise<boolean> {
     if (!this.connected) {
       return false;
     }
@@ -457,25 +490,47 @@ export class StorageEngine implements Storage {
       if (options?.layer) {
         switch (options.layer) {
           case StorageLayer.MEMORY:
-            this.setInMemory(key, value, ttl);
+            await this.l1Memory.set(key, value, ttl);
+            this.updateResponseTime(Date.now() - startTime);
             return true;
           case StorageLayer.REDIS:
-            return await this.setInRedis(key, value, ttl);
+            if (this.l2Redis) {
+              await this.l2Redis.set(key, value, ttl);
+            }
+            this.updateResponseTime(Date.now() - startTime);
+            return true;
           case StorageLayer.POSTGRES:
-            return await this.setInPostgres(key, value, ttl);
+            if (this.l3Postgres) {
+              await this.l3Postgres.set(key, value, ttl);
+            }
+            this.updateResponseTime(Date.now() - startTime);
+            return true;
         }
       }
       
-      // Store in all available layers
-      this.setInMemory(key, value, ttl);
-      
-      if (this.redisClient) {
-        await this.setInRedis(key, value, ttl);
+      // L3-First Write Strategy: Write to PostgreSQL first (source of truth)
+      if (this.l3Postgres) {
+        try {
+          await this.l3Postgres.set(key, value, ttl);
+        } catch (error) {
+          const err = error as Error;
+          this.log('error', `Critical: L3 PostgreSQL write failed for ${key}`, {
+            error: err.message,
+            stack: err.stack,
+            operation: 'set',
+            key,
+            layer: 'L3'
+          });
+          this.updateResponseTime(Date.now() - startTime);
+          return false; // L3 failure is critical - abort operation
+        }
       }
       
-      if (this.db) {
-        await this.setInPostgres(key, value, ttl);
-      }
+      // Best-effort cache warming - tolerate cache failures using Promise.allSettled
+      await Promise.allSettled([
+        this.l1Memory.set(key, value, ttl),
+        this.l2Redis ? this.l2Redis.set(key, value, ttl) : Promise.resolve()
+      ]);
       
       this.updateResponseTime(Date.now() - startTime);
       return true;
@@ -493,7 +548,15 @@ export class StorageEngine implements Storage {
   }
   
   /**
-   * Delete from all storage layers
+   * Delete from all storage layers using resilient approach
+   * 
+   * Uses Promise.allSettled to attempt deletion from all layers without
+   * failing if individual layers are unavailable. This provides graceful
+   * degradation - even if cache layers fail, the operation continues.
+   * 
+   * @param key - The key to delete
+   * @param options - Optional storage options (layer targeting)
+   * @returns Promise resolving to true if operation completed
    */
   async delete(key: string, options: StorageOptions = {}): Promise<boolean> {
     const startTime = Date.now();
@@ -504,27 +567,31 @@ export class StorageEngine implements Storage {
       if (options?.layer) {
         switch (options.layer) {
           case StorageLayer.MEMORY:
-            this.memoryCache.delete(key);
-            this.memoryCacheTTL.delete(key);
+            await this.l1Memory.delete(key);
+            this.updateResponseTime(Date.now() - startTime);
             return true;
           case StorageLayer.REDIS:
-            return await this.deleteFromRedis(key);
+            if (this.l2Redis) {
+              await this.l2Redis.delete(key);
+            }
+            this.updateResponseTime(Date.now() - startTime);
+            return true;
           case StorageLayer.POSTGRES:
-            return await this.deleteFromPostgres(key);
+            if (this.l3Postgres) {
+              await this.l3Postgres.delete(key);
+            }
+            this.updateResponseTime(Date.now() - startTime);
+            return true;
         }
       }
       
-      // Delete from all layers
-      this.memoryCache.delete(key);
-      this.memoryCacheTTL.delete(key);
-      
-      if (this.redisClient) {
-        await this.redisClient.del(key);
-      }
-      
-      if (this.db) {
-        await this.deleteFromPostgres(key);
-      }
+      // Delete from all layers using Promise.allSettled for resilience
+      // Even if some layers fail, we continue with others
+      await Promise.allSettled([
+        this.l1Memory.delete(key),
+        this.l2Redis ? this.l2Redis.delete(key) : Promise.resolve(),
+        this.l3Postgres ? this.l3Postgres.delete(key) : Promise.resolve()
+      ]);
       
       this.updateResponseTime(Date.now() - startTime);
       return true;
@@ -550,29 +617,27 @@ export class StorageEngine implements Storage {
       if (options?.layer) {
         switch (options.layer) {
           case StorageLayer.MEMORY:
-            return this.getFromMemory(key) !== null;
+            return await this.l1Memory.exists(key);
           case StorageLayer.REDIS:
-            return this.redisClient ? await this.redisClient.exists(key) === 1 : false;
+            return this.l2Redis ? await this.l2Redis.exists(key) : false;
           case StorageLayer.POSTGRES:
-            return this.db ? await this.getFromPostgres(key) !== null : false;
+            return this.l3Postgres ? await this.l3Postgres.exists(key) : false;
         }
       }
       
-      // Check memory first
-      if (this.getFromMemory(key) !== null) {
+      // Check L1 (Memory) first
+      if (await this.l1Memory.exists(key)) {
         return true;
       }
       
-      // Check Redis
-      if (this.redisClient) {
-        const exists = await this.redisClient.exists(key);
-        if (exists) return true;
+      // Check L2 (Redis)
+      if (this.l2Redis && await this.l2Redis.exists(key)) {
+        return true;
       }
       
-      // Check PostgreSQL
-      if (this.db) {
-        const pgValue = await this.getFromPostgres(key);
-        return pgValue !== null;
+      // Check L3 (PostgreSQL)
+      if (this.l3Postgres && await this.l3Postgres.exists(key)) {
+        return true;
       }
       
       return false;
@@ -590,23 +655,20 @@ export class StorageEngine implements Storage {
   
   /**
    * Set expiration for a key
+   * 
+   * Note: This is a simplified implementation that re-sets the value with new TTL.
+   * For a more efficient implementation, layers would need an expire() method.
    */
   async expire(key: string, ttl: number): Promise<boolean> {
     try {
-      // Update memory TTL
-      if (this.memoryCache.has(key)) {
-        this.memoryCacheTTL.set(key, Date.now() + (ttl * 1000));
+      // Get current value
+      const value = await this.get(key);
+      if (value === null) {
+        return false;
       }
       
-      // Update Redis TTL
-      if (this.redisClient) {
-        await this.redisClient.expire(key, ttl);
-      }
-      
-      // PostgreSQL TTL update would require updating the expires_at column
-      // This is more complex and might not be needed for all use cases
-      
-      return true;
+      // Re-set with new TTL
+      return await this.set(key, value, { ttl });
     } catch (error) {
       const err = error as Error;
       this.log('error', `Error setting expiration for ${key}`, {
@@ -721,73 +783,73 @@ export class StorageEngine implements Storage {
     };
   }
   
-  async keys(pattern = '*'): Promise<string[]> {
+  /**
+   * Get all keys matching a pattern
+   * 
+   * **IMPORTANT**: This method is currently not fully functional with the modular layer architecture.
+   * Pattern-based key listing requires each layer to expose a keys() method, which is not yet
+   * implemented in the StorageLayerInterface.
+   * 
+   * **Current Behavior**: Returns empty array
+   * 
+   * **Future Implementation**: Will require adding keys() method to StorageLayerInterface and
+   * implementing it in each layer class (MemoryStorage, RedisStorage, PostgresStorage).
+   * 
+   * @param _pattern - Glob pattern for key matching (currently not used)
+   * @returns Promise resolving to array of matching keys (currently always empty)
+   * 
+   * @deprecated This method needs reimplementation for the modular architecture
+   * @see https://github.com/wgtechlabs/nuvex/issues/XXX for tracking
+   */
+  async keys(_pattern = '*'): Promise<string[]> {
     const allKeys = new Set<string>();
     
-    // Get memory keys
-    for (const key of this.memoryCache.keys()) {
-      if (!pattern || this.matchPattern(key, pattern)) {
-        allKeys.add(key);
-      }
-    }
+    // TODO: Implement keys() method in StorageLayerInterface and each layer class
+    // This would allow proper pattern-based key listing across all layers
+    // For now, return empty array to maintain API compatibility
     
-    // Get Redis keys
-    if (this.redisClient) {
-      try {
-        const redisKeys = await this.redisClient.keys(pattern || '*');
-        redisKeys.forEach((key: string) => allKeys.add(key));
-      } catch (error) {
-        this.log('warn', 'Error getting Redis keys', { error: (error as Error).message });
-      }
-    }
-    
-    // PostgreSQL keys would require a table scan - skip for now
+    this.log('warn', 'keys() method not fully implemented with modular layers - returning empty array');
     
     return Array.from(allKeys);
   }
   
   async clear(pattern = '*'): Promise<number> {
     let cleared = 0;
-      // Clear memory
-    if (pattern === '*') {
-      cleared = this.memoryCache.size;
-      this.memoryCache.clear();
-      this.memoryCacheTTL.clear();
-    } else {
-      for (const key of this.memoryCache.keys()) {
-        if (this.matchPattern(key, pattern)) {
-          this.memoryCache.delete(key);
-          this.memoryCacheTTL.delete(key);
-          cleared++;
-        }
-      }
-    }
     
-    // Clear Redis
-    if (this.redisClient) {
-      try {
-        if (pattern === '*') {
-          await this.redisClient.flushDb();
-        } else {
-          const keys = await this.redisClient.keys(pattern);
-          if (keys.length > 0) {
-            await this.redisClient.del(keys);
-          }
-        }      } catch (error) {
-        this.log('warn', 'Error clearing Redis', { error: (error as Error).message });
-      }
-    }
-
-    // Clear PostgreSQL  
-    if (this.db) {
-      try {
-        if (pattern === '*') {
-          await this.db.query('DELETE FROM nuvex_storage');
-        } else {
-          await this.db.query('DELETE FROM nuvex_storage WHERE key LIKE $1', [pattern.replace('*', '%')]);
+    // For now, only support clearing all (pattern = '*')
+    // Pattern-based clearing would require keys() implementation in each layer
+    if (pattern === '*') {
+      // Clear memory (L1)
+      cleared = this.l1Memory.size();
+      await this.l1Memory.clear();
+      
+      // Clear Redis (L2) - best effort
+      if (this.l2Redis) {
+        try {
+          await this.l2Redis.clear();
+        } catch (error) {
+          this.log('warn', 'Error clearing Redis L2', { 
+            error: error instanceof Error ? error.message : String(error) 
+          });
         }
-      } catch (error) {
-        this.log('warn', 'Error clearing PostgreSQL', { error: (error as Error).message });
+      }
+      
+      // Clear PostgreSQL (L3) - best effort
+      if (this.l3Postgres) {
+        try {
+          await this.l3Postgres.clear();
+        } catch (error) {
+          this.log('warn', 'Error clearing PostgreSQL L3', { 
+            error: error instanceof Error ? error.message : String(error) 
+          });
+        }
+      }
+    } else {
+      // Pattern-based clearing - iterate through keys
+      const keys = await this.keys(pattern);
+      for (const key of keys) {
+        await this.delete(key);
+        cleared++;
       }
     }
     
@@ -812,6 +874,49 @@ export class StorageEngine implements Storage {
     };
   }
   
+  /**
+   * Perform health check on all storage layers
+   * 
+   * Uses Promise.allSettled to check all layers independently without
+   * failing if one layer is down. Each layer's ping() method is called
+   * to verify its operational status.
+   * 
+   * **Layer Health Checks:**
+   * - Memory (L1): Always healthy if app is running
+   * - Redis (L2): PING command verification
+   * - PostgreSQL (L3): SELECT 1 query verification
+   * 
+   * @returns Promise resolving to health status of each layer
+   * 
+   * @example
+   * ```typescript
+   * const health = await engine.healthCheck();
+   * console.log('Memory:', health.memory);    // true/false
+   * console.log('Redis:', health.redis);      // true/false
+   * console.log('PostgreSQL:', health.postgres); // true/false
+   * 
+   * if (!health.redis) {
+   *   console.warn('Redis layer is down, degraded performance expected');
+   * }
+   * ```
+   * 
+   * @since 1.0.0
+   * @public
+   */
+  async healthCheck(): Promise<Record<string, boolean>> {
+    const results = await Promise.allSettled([
+      this.l1Memory.ping(),
+      this.l2Redis ? this.l2Redis.ping() : Promise.resolve(false),
+      this.l3Postgres ? this.l3Postgres.ping() : Promise.resolve(false)
+    ]);
+
+    return {
+      memory: results[0].status === 'fulfilled' && results[0].value === true,
+      redis: results[1].status === 'fulfilled' && results[1].value === true,
+      postgres: results[2].status === 'fulfilled' && results[2].value === true,
+    };
+  }
+  
   // Layer management
   async promote(key: string, targetLayer: string): Promise<boolean> {
     try {
@@ -820,17 +925,27 @@ export class StorageEngine implements Storage {
       
       switch (targetLayer) {
         case StorageLayer.MEMORY:
-          this.setInMemory(key, value);
+          await this.l1Memory.set(key, value);
           return true;
         case StorageLayer.REDIS:
-          return await this.setInRedis(key, value);
+          if (this.l2Redis) {
+            await this.l2Redis.set(key, value);
+            return true;
+          }
+          return false;
         case StorageLayer.POSTGRES:
-          return await this.setInPostgres(key, value);
+          if (this.l3Postgres) {
+            await this.l3Postgres.set(key, value);
+            return true;
+          }
+          return false;
         default:
           return false;
       }
     } catch (error) {
-      this.log('error', `Error promoting ${key} to ${targetLayer}`, { error: (error as Error).message });
+      this.log('error', `Error promoting ${key} to ${targetLayer}`, { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
       return false;
     }
   }
@@ -840,176 +955,60 @@ export class StorageEngine implements Storage {
     try {
       switch (targetLayer) {
         case StorageLayer.POSTGRES:
-          // Remove from memory and Redis
-          this.memoryCache.delete(key);
-          this.memoryCacheTTL.delete(key);
-          if (this.redisClient) {
-            await this.redisClient.del(key);
+          // Remove from memory (L1) and Redis (L2)
+          await this.l1Memory.delete(key);
+          if (this.l2Redis) {
+            await this.l2Redis.delete(key);
           }
           return true;
         case StorageLayer.REDIS:
-          // Remove from memory only
-          this.memoryCache.delete(key);
-          this.memoryCacheTTL.delete(key);
+          // Remove from memory (L1) only
+          await this.l1Memory.delete(key);
           return true;
         default:
           return false;
       }
     } catch (error) {
-      this.log('error', `Error demoting ${key} to ${targetLayer}`, { error: (error as Error).message });
+      this.log('error', `Error demoting ${key} to ${targetLayer}`, { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
       return false;
     }
   }
   
   async getLayerInfo(key: string): Promise<{ layer: string; ttl?: number } | null> {
-    // Check which layer has the key
-    if (this.getFromMemory(key) !== null) {
-      const expiration = this.memoryCacheTTL.get(key);
-      const ttl = expiration ? Math.max(0, Math.floor((expiration - Date.now()) / 1000)) : undefined;
-      return { layer: StorageLayer.MEMORY, ttl };
+    // Check which layer has the key (L1 → L2 → L3)
+    if (await this.l1Memory.exists(key)) {
+      return { layer: StorageLayer.MEMORY };
     }
     
-    if (this.redisClient && await this.redisClient.exists(key)) {
-      const ttl = await this.redisClient.ttl(key);
-      return { layer: StorageLayer.REDIS, ttl: ttl > 0 ? ttl : undefined };
+    if (this.l2Redis && await this.l2Redis.exists(key)) {
+      return { layer: StorageLayer.REDIS };
     }
     
-    if (this.db && await this.getFromPostgres(key) !== null) {
+    if (this.l3Postgres && await this.l3Postgres.exists(key)) {
       return { layer: StorageLayer.POSTGRES };
     }
     
-    return null;  }
+    return null;
+  }
   
   // Private helper methods
-  private getFromMemory<T = unknown>(key: string): T | null {
-    const expiration = this.memoryCacheTTL.get(key);
-    if (expiration && Date.now() > expiration) {
-      // Expired, clean up
-      this.memoryCache.delete(key);
-      this.memoryCacheTTL.delete(key);
-      return null;
-    }
-    const value = this.memoryCache.get(key);
-    return value !== undefined ? (value as T) : null;
-  }
-  
-  private setInMemory(key: string, value: unknown, ttl?: number): void {
-    // Check memory size limit
-    if (this.memoryCache.size >= this.maxMemorySize && !this.memoryCache.has(key)) {
-      // Remove oldest entry (simple LRU)
-      const firstKey = this.memoryCache.keys().next().value;
-      if (firstKey) {
-        this.memoryCache.delete(firstKey);
-        this.memoryCacheTTL.delete(firstKey);
-      }
-    }
-    
-    this.memoryCache.set(key, value);
-    const expirationTime = ttl ? Date.now() + (ttl * 1000) : Date.now() + this.memoryTTL;
-    this.memoryCacheTTL.set(key, expirationTime);
-  }
-  
-  private async getFromRedis<T = unknown>(key: string): Promise<T | null> {
-    if (!this.redisClient) return null;
-    
-    try {
-      const redisCached = await this.redisClient.get(key);
-      return redisCached ? JSON.parse(redisCached) : null;
-    } catch (error) {
-      this.log('error', `Error getting from Redis: ${key}`, { error: (error as Error).message });
-      return null;
-    }
-  }
-  
-  private async setInRedis(key: string, value: unknown, ttl?: number): Promise<boolean> {
-    if (!this.redisClient) return false;
-    
-    try {
-      const redisTTL = ttl || this.redisConfig.ttl;
-      await this.redisClient.setEx(key, redisTTL, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      this.log('error', `Error setting in Redis: ${key}`, { error: (error as Error).message });
-      return false;
-    }
-  }
-  
-  private async deleteFromRedis(key: string): Promise<boolean> {
-    if (!this.redisClient) return false;
-    
-    try {
-      await this.redisClient.del(key);
-      return true;
-    } catch (error) {
-      this.log('error', `Error deleting from Redis: ${key}`, { error: (error as Error).message });
-      return false;
-    }
-  }
-    // PostgreSQL operations using key-value table
-  private async getFromPostgres<T = unknown>(key: string): Promise<T | null> {
-    if (!this.db) return null;
-    
-    try {
-      const result = await this.db.query(
-        'SELECT value FROM nuvex_storage WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())',
-        [key]
-      );
-      return result.rows.length > 0 ? JSON.parse(result.rows[0].value) : null;
-    } catch (_error) {
-      // Table might not exist, that's okay for now
-      this.log('debug', 'nuvex_storage table not found, using Redis + Memory only');
-      return null;
-    }
-  }
-  
-  private async setInPostgres(key: string, value: unknown, ttl?: number): Promise<boolean> {
-    if (!this.db) return false;
-    
-    try {
-      const expiresAt = ttl ? new Date(Date.now() + (ttl * 1000)) : null;
-      await this.db.query(
-        `INSERT INTO nuvex_storage (key, value, expires_at) 
-         VALUES ($1, $2, $3)
-         ON CONFLICT (key) 
-         DO UPDATE SET value = $2, expires_at = $3, updated_at = NOW()`,
-        [key, JSON.stringify(value), expiresAt]
-      );
-      return true;
-    } catch (_error) {
-      // Table might not exist, that's okay for now
-      this.log('debug', 'nuvex_storage table not found, using Redis + Memory only');
-      return false;
-    }
-  }
-  
-  private async deleteFromPostgres(key: string): Promise<boolean> {
-    if (!this.db) return false;
-    
-    try {
-      await this.db.query('DELETE FROM nuvex_storage WHERE key = $1', [key]);
-      return true;
-    } catch (_error) {
-      // Table might not exist, that's okay
-      this.log('debug', 'nuvex_storage table not found');
-      return false;
-    }
-  }
   
   // Memory cleanup
   private startMemoryCleanup(): void {
-    const cleanupInterval = this.memoryTTL / 24; // Clean up 24 times per TTL period
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      let cleaned = 0;
-      for (const [key, expiration] of this.memoryCacheTTL.entries()) {
-        if (now > expiration) {
-          this.memoryCache.delete(key);
-          this.memoryCacheTTL.delete(key);
-          cleaned++;
+    const memoryTTL = this.config.memory?.ttl || 24 * 60 * 60 * 1000; // 24 hours default
+    const cleanupInterval = memoryTTL / 24; // Clean up 24 times per TTL period
+    this.cleanupInterval = setInterval(async () => {
+      try {
+        const cleaned = await this.l1Memory.cleanup();
+        if (cleaned > 0) {
+          this.log('debug', `Memory L1 cleanup completed - removed ${cleaned} expired entries`);
         }
-      }
-      if (cleaned > 0) {
-        this.log('debug', `Memory cleanup completed - removed ${cleaned} expired entries`);
+      } catch (error) {
+        this.log('error', 'Memory cleanup error', { 
+          error: error instanceof Error ? error.message : String(error) 
+        });
       }
     }, cleanupInterval);
   }
@@ -1066,28 +1065,17 @@ export class StorageEngine implements Storage {
   // Legacy compatibility methods (for migration)
   getStats() {
     return {
-      memoryKeys: this.memoryCache.size,
+      memoryKeys: this.l1Memory.size(),
       connected: this.connected,
       layers: {
         memory: true,
-        redis: !!this.redisClient,
-        postgres: !!this.db
+        redis: this.l2Redis ? this.l2Redis.isConnected() : false,
+        postgres: this.l3Postgres ? this.l3Postgres.isConnected() : false
       }
     };
   }
   
-  cleanupExpiredMemory(): number {
-    const now = Date.now();
-    let cleanedCount = 0;
-    
-    for (const [key, expiration] of this.memoryCacheTTL.entries()) {
-      if (now > expiration) {
-        this.memoryCache.delete(key);
-        this.memoryCacheTTL.delete(key);
-        cleanedCount++;
-      }
-    }
-    
-    return cleanedCount;
+  async cleanupExpiredMemory(): Promise<number> {
+    return await this.l1Memory.cleanup();
   }
 }
