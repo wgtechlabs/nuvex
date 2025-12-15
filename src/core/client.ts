@@ -907,17 +907,60 @@ export class NuvexClient implements IStore {
   }
   
   /**
-   * Increment a numeric value atomically
+   * Increment a numeric value using get-modify-set pattern
    * 
-   * Note: This is a simplified implementation after the modular layer refactoring.
-   * For true atomic operations, layers would need to expose their clients directly
-   * or implement atomic increment methods in the StorageLayerInterface.
+   * ⚠️ **CONCURRENCY WARNING:**
+   * This method is NOT atomic and can lose updates under concurrent access.
+   * Uses a get-modify-set pattern which has a race condition window where
+   * concurrent increments may overwrite each other, resulting in lost updates.
    * 
-   * TODO: Implement proper atomic operations in layer classes
+   * **Thread-Safety:**
+   * - ❌ NOT safe for concurrent increments to the same key
+   * - ❌ Lost updates possible in high-concurrency scenarios
+   * - ✅ Safe only for single-threaded or low-concurrency use cases
+   * 
+   * **Example Race Condition:**
+   * ```typescript
+   * // ❌ UNSAFE: Concurrent increments may lose updates
+   * await Promise.all([
+   *   client.increment('counter'),  // reads 5, writes 6
+   *   client.increment('counter')   // reads 5, writes 6 (lost update!)
+   * ]);
+   * // Expected: 7, Actual: 6 (one increment lost)
+   * 
+   * // ✅ SAFE: Sequential operations
+   * await client.increment('counter');
+   * await client.increment('counter');
+   * 
+   * // ✅ SAFE: Application-level locking/serialization
+   * await lock.acquire('counter');
+   * try {
+   *   await client.increment('counter');
+   * } finally {
+   *   await lock.release('counter');
+   * }
+   * ```
+   * 
+   * **Recommended for:**
+   * - Low-concurrency scenarios
+   * - Non-critical counters (statistics, analytics)
+   * - Single-threaded applications
+   * 
+   * **Not recommended for:**
+   * - High-concurrency counters (user credits, inventory)
+   * - Financial operations requiring exactness
+   * - Distributed systems without external locking
+   * 
+   * @param key - The key to increment
+   * @param delta - The amount to increment by (default: 1)
+   * @returns Promise resolving to the new value (may be incorrect under concurrent access)
+   * 
+   * @see https://github.com/wgtechlabs/nuvex/issues/11 - Track atomic operations implementation
+   * @see https://en.wikipedia.org/wiki/Time-of-check-to-time-of-use - TOCTOU race condition
    */
   async increment(key: string, delta = 1): Promise<number> {
-    // Simplified implementation using get-modify-set pattern
-    // Not truly atomic, but works with the new layer architecture
+    // Get-modify-set pattern (NOT atomic)
+    // Race condition window exists between get and set operations
     const currentValue = await this.storage.get<number>(key);
     const newValue = (currentValue || 0) + delta;
     await this.storage.set(key, newValue);
