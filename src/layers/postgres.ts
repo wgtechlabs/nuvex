@@ -219,9 +219,9 @@ export class PostgresStorage implements StorageLayerInterface {
   async disconnect(): Promise<void> {
     if (this.pool && this.ownsPool) {
       await this.pool.end();
-      this.connected = false;
       this.log('info', 'PostgreSQL L3: Disconnected');
     }
+    this.connected = false;
   }
 
   /**
