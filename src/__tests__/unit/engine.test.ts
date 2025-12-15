@@ -533,6 +533,7 @@ describe('StorageEngine', () => {
       expect(metrics).not.toHaveProperty('redisHits');
       expect(metrics).not.toHaveProperty('postgresHits');
       expect(metrics).not.toHaveProperty('totalOperations');
+      expect(metrics).not.toHaveProperty('cacheHitRatio');
     });
 
     test('should get redis-specific metrics only', async () => {
@@ -570,6 +571,9 @@ describe('StorageEngine', () => {
       // Should include overall metrics for multiple layers
       expect(metrics).toHaveProperty('totalOperations');
       expect(metrics).toHaveProperty('averageResponseTime');
+      expect(metrics).toHaveProperty('cacheHitRatio');
+      expect(metrics.cacheHitRatio).toBeGreaterThanOrEqual(0);
+      expect(metrics.cacheHitRatio).toBeLessThanOrEqual(1);
     });
 
     test('should get metrics for all three layers when specified as array', async () => {
@@ -584,6 +588,7 @@ describe('StorageEngine', () => {
       expect(metrics).toHaveProperty('postgresMisses');
       expect(metrics).toHaveProperty('totalOperations');
       expect(metrics).toHaveProperty('averageResponseTime');
+      expect(metrics).toHaveProperty('cacheHitRatio');
     });
 
     test('should calculate cache hit ratio correctly', async () => {

@@ -885,7 +885,7 @@ export class StorageEngine implements Storage {
    * 
    * // Get multiple layer metrics
    * const cacheMetrics = engine.getMetrics(['memory', 'redis']);
-   * // { memoryHits, memoryMisses, memorySize, redisHits, redisMisses }
+   * // { memoryHits, memoryMisses, memorySize, redisHits, redisMisses, totalOperations, averageResponseTime, cacheHitRatio }
    * ```
    * 
    * @since 1.0.0
@@ -933,6 +933,7 @@ export class StorageEngine implements Storage {
     if (layersToGet.length > 1) {
       filteredMetrics.totalOperations = this.metrics.totalOperations;
       filteredMetrics.averageResponseTime = this.metrics.averageResponseTime;
+      filteredMetrics.cacheHitRatio = this.calculateCacheHitRatio(layersToGet);
     }
     
     return filteredMetrics;
@@ -1144,9 +1145,34 @@ export class StorageEngine implements Storage {
       alpha * duration + (1 - alpha) * this.metrics.averageResponseTime;
   }
   
-  private calculateCacheHitRatio(): number {
-    const totalHits = this.metrics.memoryHits + this.metrics.redisHits + this.metrics.postgresHits;
-    const totalMisses = this.metrics.memoryMisses + this.metrics.redisMisses + this.metrics.postgresMisses;
+  private calculateCacheHitRatio(layers?: Array<'memory' | 'redis' | 'postgres'>): number {
+    let totalHits = 0;
+    let totalMisses = 0;
+    
+    // If no layers specified, calculate for all layers
+    if (!layers) {
+      totalHits = this.metrics.memoryHits + this.metrics.redisHits + this.metrics.postgresHits;
+      totalMisses = this.metrics.memoryMisses + this.metrics.redisMisses + this.metrics.postgresMisses;
+    } else {
+      // Calculate only for specified layers
+      for (const layer of layers) {
+        switch (layer) {
+          case 'memory':
+            totalHits += this.metrics.memoryHits;
+            totalMisses += this.metrics.memoryMisses;
+            break;
+          case 'redis':
+            totalHits += this.metrics.redisHits;
+            totalMisses += this.metrics.redisMisses;
+            break;
+          case 'postgres':
+            totalHits += this.metrics.postgresHits;
+            totalMisses += this.metrics.postgresMisses;
+            break;
+        }
+      }
+    }
+    
     return totalHits + totalMisses > 0 ? totalHits / (totalHits + totalMisses) : 0;
   }
   
