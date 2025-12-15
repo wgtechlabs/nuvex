@@ -87,15 +87,44 @@ describe('NuvexClient', () => {
   });
 
   describe('Health Check', () => {
-    test('should return health status', async () => {
+    test('should return health status for all layers', async () => {
       const health = await client.healthCheck();
       
       expect(health).toHaveProperty('memory');
       expect(health).toHaveProperty('redis');
       expect(health).toHaveProperty('postgres');
-      expect(health).toHaveProperty('overall');
+    });
+
+    test('should check specific layer - memory', async () => {
+      const health = await client.healthCheck('memory');
       
-      expect(health.overall).toBe(true);
+      expect(health).toHaveProperty('memory');
+      expect(health).not.toHaveProperty('redis');
+      expect(health).not.toHaveProperty('postgres');
+    });
+
+    test('should check specific layer - redis', async () => {
+      const health = await client.healthCheck('redis');
+      
+      expect(health).toHaveProperty('redis');
+      expect(health).not.toHaveProperty('memory');
+      expect(health).not.toHaveProperty('postgres');
+    });
+
+    test('should check specific layer - postgres', async () => {
+      const health = await client.healthCheck('postgres');
+      
+      expect(health).toHaveProperty('postgres');
+      expect(health).not.toHaveProperty('memory');
+      expect(health).not.toHaveProperty('redis');
+    });
+
+    test('should check multiple specific layers', async () => {
+      const health = await client.healthCheck(['memory', 'redis']);
+      
+      expect(health).toHaveProperty('memory');
+      expect(health).toHaveProperty('redis');
+      expect(health).not.toHaveProperty('postgres');
     });
   });
 
@@ -117,7 +146,7 @@ describe('NuvexClient', () => {
   });
 
   describe('Metrics', () => {
-    test('should provide storage metrics', async () => {
+    test('should provide all storage metrics', async () => {
       // Perform some operations to generate metrics
       await client.set('metric1', { data: 1 });
       await client.get('metric1');
@@ -129,6 +158,54 @@ describe('NuvexClient', () => {
       expect(metrics).toHaveProperty('memoryMisses');
       expect(metrics).toHaveProperty('totalOperations');
       expect(metrics.totalOperations).toBeGreaterThan(0);
+    });
+
+    test('should get memory-specific metrics', async () => {
+      const metrics = client.getMetrics('memory');
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('memoryMisses');
+      expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
+      expect(metrics).not.toHaveProperty('redisHits');
+      expect(metrics).not.toHaveProperty('postgresHits');
+    });
+
+    test('should get redis-specific metrics', async () => {
+      const metrics = client.getMetrics('redis');
+      
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('redisMisses');
+      expect(metrics).not.toHaveProperty('memoryHits');
+      expect(metrics).not.toHaveProperty('postgresHits');
+    });
+
+    test('should get postgres-specific metrics', async () => {
+      const metrics = client.getMetrics('postgres');
+      
+      expect(metrics).toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('postgresMisses');
+      expect(metrics).not.toHaveProperty('memoryHits');
+      expect(metrics).not.toHaveProperty('redisHits');
+    });
+
+    test('should get metrics for multiple layers', async () => {
+      const metrics = client.getMetrics(['memory', 'redis']);
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).not.toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('totalOperations');
+      expect(metrics).toHaveProperty('averageResponseTime');
+    });
+
+    test('should get all metrics with "all" parameter', async () => {
+      const metrics = client.getMetrics('all');
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('totalOperations');
     });
 
     test('should reset metrics', async () => {
@@ -195,9 +272,11 @@ describe('NuvexClient', () => {
       expect(deleted).toBe(true);
 
       const health = await NuvexClient.healthCheck();
-      expect(health).toHaveProperty('overall');
+      expect(health).toHaveProperty('memory');
+      expect(health).toHaveProperty('redis');
+      expect(health).toHaveProperty('postgres');
 
-      const metrics = await NuvexClient.getMetrics();
+      const metrics = NuvexClient.getMetrics();
       expect(metrics).toHaveProperty('totalOperations');
     });
   });

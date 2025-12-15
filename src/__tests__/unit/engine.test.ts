@@ -420,4 +420,192 @@ describe('StorageEngine', () => {
       expect(result).toEqual({ data: 'test' });
     });
   });
+
+  describe('Health Check - Specific Layer Support', () => {
+    test('should check all layers when no parameter provided', async () => {
+      const health = await storageEngine.healthCheck();
+      
+      expect(health).toHaveProperty('memory');
+      expect(health).toHaveProperty('redis');
+      expect(health).toHaveProperty('postgres');
+      expect(typeof health.memory).toBe('boolean');
+      expect(typeof health.redis).toBe('boolean');
+      expect(typeof health.postgres).toBe('boolean');
+    });
+
+    test('should check specific layer - memory', async () => {
+      const health = await storageEngine.healthCheck('memory');
+      
+      expect(health).toHaveProperty('memory');
+      expect(health).not.toHaveProperty('redis');
+      expect(health).not.toHaveProperty('postgres');
+      expect(typeof health.memory).toBe('boolean');
+    });
+
+    test('should check specific layer - redis', async () => {
+      const health = await storageEngine.healthCheck('redis');
+      
+      expect(health).toHaveProperty('redis');
+      expect(health).not.toHaveProperty('memory');
+      expect(health).not.toHaveProperty('postgres');
+      expect(typeof health.redis).toBe('boolean');
+    });
+
+    test('should check specific layer - postgres', async () => {
+      const health = await storageEngine.healthCheck('postgres');
+      
+      expect(health).toHaveProperty('postgres');
+      expect(health).not.toHaveProperty('memory');
+      expect(health).not.toHaveProperty('redis');
+      expect(typeof health.postgres).toBe('boolean');
+    });
+
+    test('should check multiple specific layers', async () => {
+      const health = await storageEngine.healthCheck(['memory', 'redis']);
+      
+      expect(health).toHaveProperty('memory');
+      expect(health).toHaveProperty('redis');
+      expect(health).not.toHaveProperty('postgres');
+      expect(typeof health.memory).toBe('boolean');
+      expect(typeof health.redis).toBe('boolean');
+    });
+
+    test('should check all three layers when specified as array', async () => {
+      const health = await storageEngine.healthCheck(['memory', 'redis', 'postgres']);
+      
+      expect(health).toHaveProperty('memory');
+      expect(health).toHaveProperty('redis');
+      expect(health).toHaveProperty('postgres');
+      expect(typeof health.memory).toBe('boolean');
+      expect(typeof health.redis).toBe('boolean');
+      expect(typeof health.postgres).toBe('boolean');
+    });
+  });
+
+  describe('Metrics - Specific Layer Support', () => {
+    beforeEach(async () => {
+      // Reset metrics and set some data to generate metrics
+      storageEngine.resetMetrics();
+      await storageEngine.set('metrics:test1', { data: 'test1' });
+      await storageEngine.get('metrics:test1');
+      await storageEngine.get('metrics:nonexistent');
+    });
+
+    test('should get all metrics when no parameter provided', async () => {
+      const metrics = storageEngine.getMetrics();
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('memoryMisses');
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('redisMisses');
+      expect(metrics).toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('postgresMisses');
+      expect(metrics).toHaveProperty('totalOperations');
+      expect(metrics).toHaveProperty('averageResponseTime');
+      expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
+      expect(metrics).toHaveProperty('cacheHitRatio');
+    });
+
+    test('should get all metrics with "all" parameter', async () => {
+      const metrics = storageEngine.getMetrics('all');
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('memoryMisses');
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('redisMisses');
+      expect(metrics).toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('postgresMisses');
+      expect(metrics).toHaveProperty('totalOperations');
+      expect(metrics).toHaveProperty('averageResponseTime');
+      expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
+      expect(metrics).toHaveProperty('cacheHitRatio');
+    });
+
+    test('should get memory-specific metrics only', async () => {
+      const metrics = storageEngine.getMetrics('memory');
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('memoryMisses');
+      expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
+      expect(metrics).not.toHaveProperty('redisHits');
+      expect(metrics).not.toHaveProperty('postgresHits');
+      expect(metrics).not.toHaveProperty('totalOperations');
+      expect(metrics).not.toHaveProperty('cacheHitRatio');
+    });
+
+    test('should get redis-specific metrics only', async () => {
+      const metrics = storageEngine.getMetrics('redis');
+      
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('redisMisses');
+      expect(metrics).not.toHaveProperty('memoryHits');
+      expect(metrics).not.toHaveProperty('postgresHits');
+      expect(metrics).not.toHaveProperty('memorySize');
+      expect(metrics).not.toHaveProperty('totalOperations');
+    });
+
+    test('should get postgres-specific metrics only', async () => {
+      const metrics = storageEngine.getMetrics('postgres');
+      
+      expect(metrics).toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('postgresMisses');
+      expect(metrics).not.toHaveProperty('memoryHits');
+      expect(metrics).not.toHaveProperty('redisHits');
+      expect(metrics).not.toHaveProperty('memorySize');
+      expect(metrics).not.toHaveProperty('totalOperations');
+    });
+
+    test('should get metrics for multiple specific layers', async () => {
+      const metrics = storageEngine.getMetrics(['memory', 'redis']);
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('memoryMisses');
+      expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('redisMisses');
+      expect(metrics).not.toHaveProperty('postgresHits');
+      // Should include overall metrics for multiple layers
+      expect(metrics).toHaveProperty('totalOperations');
+      expect(metrics).toHaveProperty('averageResponseTime');
+      expect(metrics).toHaveProperty('cacheHitRatio');
+      expect(metrics.cacheHitRatio).toBeGreaterThanOrEqual(0);
+      expect(metrics.cacheHitRatio).toBeLessThanOrEqual(1);
+    });
+
+    test('should get metrics for all three layers when specified as array', async () => {
+      const metrics = storageEngine.getMetrics(['memory', 'redis', 'postgres']);
+      
+      expect(metrics).toHaveProperty('memoryHits');
+      expect(metrics).toHaveProperty('memoryMisses');
+      expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
+      expect(metrics).toHaveProperty('redisHits');
+      expect(metrics).toHaveProperty('redisMisses');
+      expect(metrics).toHaveProperty('postgresHits');
+      expect(metrics).toHaveProperty('postgresMisses');
+      expect(metrics).toHaveProperty('totalOperations');
+      expect(metrics).toHaveProperty('averageResponseTime');
+      expect(metrics).toHaveProperty('cacheHitRatio');
+    });
+
+    test('should calculate cache hit ratio correctly', async () => {
+      storageEngine.resetMetrics();
+      
+      // Generate some hits and misses
+      await storageEngine.set('hit:1', { data: '1' });
+      await storageEngine.set('hit:2', { data: '2' });
+      await storageEngine.get('hit:1'); // Hit
+      await storageEngine.get('hit:2'); // Hit
+      await storageEngine.get('miss:1'); // Miss
+      
+      const metrics = storageEngine.getMetrics();
+      
+      expect(metrics.cacheHitRatio).toBeGreaterThanOrEqual(0);
+      expect(metrics.cacheHitRatio).toBeLessThanOrEqual(1);
+    });
+  });
 });

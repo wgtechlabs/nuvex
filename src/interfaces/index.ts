@@ -119,8 +119,8 @@ export interface Storage {
 
   // Metrics and monitoring
   
-  /** Get current performance metrics */
-  getMetrics(): StorageMetrics;
+  /** Get current performance metrics for all layers or specific layer(s) */
+  getMetrics(layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>): Record<string, number>;
   /** Reset all performance metrics to zero */
   resetMetrics(): void;
 
@@ -156,13 +156,10 @@ export interface Store extends Storage {
 
   // Health checks
   
-  /** Perform comprehensive health checks on all storage layers */
-  healthCheck(): Promise<{
-    memory: boolean;
-    redis: boolean;
-    postgres: boolean;
-    overall: boolean;
-  }>;
+  /** Perform comprehensive health checks on all storage layers or specific layer(s) */
+  healthCheck(
+    layers?: 'memory' | 'redis' | 'postgres' | Array<'memory' | 'redis' | 'postgres'>
+  ): Promise<Record<string, boolean>>;
 
   // Maintenance operations
   
