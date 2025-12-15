@@ -450,13 +450,30 @@ export class StorageEngine implements Storage {
    * 2. If L3 write succeeds, warm caches (L1, L2) using Promise.allSettled
    * 3. Cache failures don't break the operation (graceful degradation)
    * 
-   * This ensures data consistency - if L3 fails, the entire operation fails.
-   * If L3 succeeds but caches fail, data is still safe in the source of truth.
+   * **Error Handling:**
+   * - Returns `false` if L3 (PostgreSQL) write fails - operation is aborted
+   * - Returns `false` if engine is not connected
+   * - Returns `true` if L3 write succeeds (cache failures are tolerated)
+   * - For memory/Redis-only deployments (no L3), cache write success determines result
+   * 
+   * **Usage Recommendations:**
+   * ```typescript
+   * // Always check the return value for critical data
+   * const success = await engine.set('user:123', userData);
+   * if (!success) {
+   *   // Handle failure: retry, log, alert, or use fallback
+   *   console.error('Failed to persist user data');
+   *   throw new Error('Storage operation failed');
+   * }
+   * 
+   * // For non-critical data, you may proceed regardless
+   * await engine.set('cache:temp', tempData); // Fire and forget
+   * ```
    * 
    * @param key - The key to store
    * @param value - The value to store
    * @param options - Optional storage options (ttl, layer targeting)
-   * @returns Promise resolving to true if operation succeeded
+   * @returns Promise resolving to true if operation succeeded, false otherwise
    */
   async set<T = unknown>(key: string, value: T, options: StorageOptions = {}): Promise<boolean> {
     if (!this.connected) {
@@ -493,7 +510,20 @@ export class StorageEngine implements Storage {
       
       // L3-First Write Strategy: Write to PostgreSQL first (source of truth)
       if (this.l3Postgres) {
-        await this.l3Postgres.set(key, value, ttl);
+        try {
+          await this.l3Postgres.set(key, value, ttl);
+        } catch (error) {
+          const err = error as Error;
+          this.log('error', `Critical: L3 PostgreSQL write failed for ${key}`, {
+            error: err.message,
+            stack: err.stack,
+            operation: 'set',
+            key,
+            layer: 'L3'
+          });
+          this.updateResponseTime(Date.now() - startTime);
+          return false; // L3 failure is critical - abort operation
+        }
       }
       
       // Best-effort cache warming - tolerate cache failures using Promise.allSettled
