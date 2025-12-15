@@ -582,6 +582,7 @@ describe('StorageEngine', () => {
       expect(metrics).toHaveProperty('memoryHits');
       expect(metrics).toHaveProperty('memoryMisses');
       expect(metrics).toHaveProperty('memorySize');
+      expect(metrics).toHaveProperty('memoryMaxSize');
       expect(metrics).toHaveProperty('redisHits');
       expect(metrics).toHaveProperty('redisMisses');
       expect(metrics).toHaveProperty('postgresHits');

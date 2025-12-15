@@ -436,7 +436,7 @@ export class NuvexClient implements IStore {
    * 
    * // Get multiple layer metrics
    * const cacheMetrics = client.getMetrics(['memory', 'redis']);
-   * // { memoryHits, memoryMisses, memorySize, redisHits, redisMisses, totalOperations, averageResponseTime, cacheHitRatio }
+   * // { memoryHits, memoryMisses, memorySize, memoryMaxSize, redisHits, redisMisses, totalOperations, averageResponseTime, cacheHitRatio }
    * ```
    * 
    * @since 1.0.0
