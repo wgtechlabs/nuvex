@@ -16,6 +16,26 @@ import type { Logger } from '../interfaces/index.js';
 // ===== Configuration Types =====
 
 /**
+ * PostgreSQL schema configuration
+ * 
+ * Configurable table and column names for PostgreSQL storage layer.
+ * Enables backwards compatibility with existing applications and custom naming conventions.
+ * 
+ * @interface PostgresSchemaConfig
+ */
+export interface PostgresSchemaConfig {
+  /** Table name for storage (default: 'nuvex_storage') */
+  tableName?: string;
+  /** Column names configuration */
+  columns?: {
+    /** Key column name (default: 'nuvex_key') */
+    key?: string;
+    /** Data/value column name (default: 'nuvex_data') */
+    value?: string;
+  };
+}
+
+/**
  * PostgreSQL database configuration
  * 
  * Configuration options for the PostgreSQL storage layer, which serves as
@@ -42,6 +62,8 @@ export interface PostgresConfig {
   idleTimeoutMillis?: number;
   /** Time to wait for connection establishment (ms) */
   connectionTimeoutMillis?: number;
+  /** Schema configuration for table and column names (optional) */
+  schema?: PostgresSchemaConfig;
 }
 
 /**
