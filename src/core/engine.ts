@@ -857,8 +857,91 @@ export class StorageEngine implements Storage {
   }
   
   // Metrics and monitoring
-  getMetrics(): StorageMetrics {
-    return { ...this.metrics };
+  /**
+   * Get performance metrics for all layers or specific layer(s)
+   * 
+   * Returns metrics about storage operations and performance. Can be filtered
+   * to return metrics for specific layers only.
+   * 
+   * **Metrics by Layer:**
+   * - Memory: memoryHits, memoryMisses, memorySize, memoryMaxSize
+   * - Redis: redisHits, redisMisses
+   * - PostgreSQL: postgresHits, postgresMisses
+   * - Overall: totalOperations, cacheHitRatio, averageResponseTime
+   * 
+   * @param layers - Optional layer(s) to get metrics for. If not provided, returns all metrics.
+   *                 Can be a single layer string, 'all', or array of layer strings.
+   * @returns Object containing requested metrics
+   * 
+   * @example
+   * ```typescript
+   * // Get all metrics
+   * const metrics = engine.getMetrics();
+   * // { memoryHits, memoryMisses, redisHits, redisMisses, postgresHits, ... }
+   * 
+   * // Get specific layer metrics
+   * const memoryMetrics = engine.getMetrics('memory');
+   * // { memoryHits, memoryMisses, memorySize, memoryMaxSize }
+   * 
+   * // Get multiple layer metrics
+   * const cacheMetrics = engine.getMetrics(['memory', 'redis']);
+   * // { memoryHits, memoryMisses, memorySize, redisHits, redisMisses }
+   * ```
+   * 
+   * @since 1.0.0
+   * @public
+   */
+  getMetrics(
+    layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>
+  ): Record<string, number> {
+    // If no layers specified or 'all' specified, return all metrics
+    if (!layers || layers === 'all') {
+      const totalHits = this.metrics.memoryHits + this.metrics.redisHits + this.metrics.postgresHits;
+      const totalMisses = this.metrics.memoryMisses + this.metrics.redisMisses + this.metrics.postgresMisses;
+      const cacheHitRatio = totalHits + totalMisses > 0 
+        ? totalHits / (totalHits + totalMisses) 
+        : 0;
+      
+      return {
+        ...this.metrics,
+        memorySize: this.l1Memory.size(),
+        memoryMaxSize: this.l1Memory.getMaxSize(),
+        cacheHitRatio
+      };
+    }
+    
+    // Normalize layers to an array
+    const layersToGet = typeof layers === 'string' ? [layers] : layers;
+    
+    // Build filtered metrics object
+    const filteredMetrics: Record<string, number> = {};
+    
+    for (const layer of layersToGet) {
+      switch (layer) {
+        case 'memory':
+          filteredMetrics.memoryHits = this.metrics.memoryHits;
+          filteredMetrics.memoryMisses = this.metrics.memoryMisses;
+          filteredMetrics.memorySize = this.l1Memory.size();
+          filteredMetrics.memoryMaxSize = this.l1Memory.getMaxSize();
+          break;
+        case 'redis':
+          filteredMetrics.redisHits = this.metrics.redisHits;
+          filteredMetrics.redisMisses = this.metrics.redisMisses;
+          break;
+        case 'postgres':
+          filteredMetrics.postgresHits = this.metrics.postgresHits;
+          filteredMetrics.postgresMisses = this.metrics.postgresMisses;
+          break;
+      }
+    }
+    
+    // Add overall metrics if multiple layers are requested
+    if (layersToGet.length > 1) {
+      filteredMetrics.totalOperations = this.metrics.totalOperations;
+      filteredMetrics.averageResponseTime = this.metrics.averageResponseTime;
+    }
+    
+    return filteredMetrics;
   }
   
   resetMetrics(): void {
@@ -875,7 +958,7 @@ export class StorageEngine implements Storage {
   }
   
   /**
-   * Perform health check on all storage layers
+   * Perform health check on all storage layers or specific layer(s)
    * 
    * Uses Promise.allSettled to check all layers independently without
    * failing if one layer is down. Each layer's ping() method is called
@@ -886,14 +969,23 @@ export class StorageEngine implements Storage {
    * - Redis (L2): PING command verification
    * - PostgreSQL (L3): SELECT 1 query verification
    * 
-   * @returns Promise resolving to health status of each layer
+   * @param layers - Optional layer(s) to check. If not provided, checks all layers.
+   *                 Can be a single layer string or array of layer strings.
+   * @returns Promise resolving to health status of requested layer(s)
    * 
    * @example
    * ```typescript
+   * // Check all layers
    * const health = await engine.healthCheck();
-   * console.log('Memory:', health.memory);    // true/false
-   * console.log('Redis:', health.redis);      // true/false
-   * console.log('PostgreSQL:', health.postgres); // true/false
+   * // { memory: true, redis: true, postgres: true }
+   * 
+   * // Check specific layer
+   * const redisHealth = await engine.healthCheck('redis');
+   * // { redis: true }
+   * 
+   * // Check multiple specific layers
+   * const cacheHealth = await engine.healthCheck(['memory', 'redis']);
+   * // { memory: true, redis: true }
    * 
    * if (!health.redis) {
    *   console.warn('Redis layer is down, degraded performance expected');
@@ -903,18 +995,55 @@ export class StorageEngine implements Storage {
    * @since 1.0.0
    * @public
    */
-  async healthCheck(): Promise<Record<string, boolean>> {
-    const results = await Promise.allSettled([
-      this.l1Memory.ping(),
-      this.l2Redis ? this.l2Redis.ping() : Promise.resolve(false),
-      this.l3Postgres ? this.l3Postgres.ping() : Promise.resolve(false)
-    ]);
-
-    return {
-      memory: results[0].status === 'fulfilled' && results[0].value === true,
-      redis: results[1].status === 'fulfilled' && results[1].value === true,
-      postgres: results[2].status === 'fulfilled' && results[2].value === true,
-    };
+  async healthCheck(
+    layers?: 'memory' | 'redis' | 'postgres' | Array<'memory' | 'redis' | 'postgres'>
+  ): Promise<Record<string, boolean>> {
+    // Normalize layers to an array
+    let layersToCheck: Array<'memory' | 'redis' | 'postgres'>;
+    
+    if (!layers) {
+      // No layers specified - check all
+      layersToCheck = ['memory', 'redis', 'postgres'];
+    } else if (typeof layers === 'string') {
+      // Single layer specified
+      layersToCheck = [layers];
+    } else {
+      // Array of layers specified
+      layersToCheck = layers;
+    }
+    
+    // Build promises only for requested layers
+    const promises: Array<Promise<boolean>> = [];
+    const layerNames: string[] = [];
+    
+    for (const layer of layersToCheck) {
+      switch (layer) {
+        case 'memory':
+          promises.push(this.l1Memory.ping());
+          layerNames.push('memory');
+          break;
+        case 'redis':
+          promises.push(this.l2Redis ? this.l2Redis.ping() : Promise.resolve(false));
+          layerNames.push('redis');
+          break;
+        case 'postgres':
+          promises.push(this.l3Postgres ? this.l3Postgres.ping() : Promise.resolve(false));
+          layerNames.push('postgres');
+          break;
+      }
+    }
+    
+    const results = await Promise.allSettled(promises);
+    
+    // Build result object with only requested layers
+    const healthStatus: Record<string, boolean> = {};
+    
+    for (let i = 0; i < layerNames.length; i++) {
+      const result = results[i];
+      healthStatus[layerNames[i]] = result.status === 'fulfilled' && result.value === true;
+    }
+    
+    return healthStatus;
   }
   
   // Layer management
