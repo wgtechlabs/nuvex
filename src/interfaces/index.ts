@@ -120,9 +120,7 @@ export interface Storage {
   // Metrics and monitoring
   
   /** Get current performance metrics for all layers or specific layer(s) */
-  getMetrics(
-    layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>
-  ): Record<string, number>;
+  getMetrics(layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>): Record<string, number>;
   /** Reset all performance metrics to zero */
   resetMetrics(): void;
 

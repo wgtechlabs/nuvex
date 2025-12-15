@@ -191,6 +191,118 @@ export interface StorageMetrics {
 }
 
 /**
+ * Memory layer specific metrics
+ * 
+ * @interface MemoryMetrics
+ */
+export interface MemoryMetrics {
+  /** Number of successful cache hits in memory layer */
+  memoryHits: number;
+  /** Number of cache misses in memory layer */
+  memoryMisses: number;
+  /** Current number of entries in memory cache */
+  memorySize: number;
+  /** Maximum number of entries allowed in memory cache */
+  memoryMaxSize: number;
+}
+
+/**
+ * Redis layer specific metrics
+ * 
+ * @interface RedisMetrics
+ */
+export interface RedisMetrics {
+  /** Number of successful cache hits in Redis layer */
+  redisHits: number;
+  /** Number of cache misses in Redis layer */
+  redisMisses: number;
+}
+
+/**
+ * PostgreSQL layer specific metrics
+ * 
+ * @interface PostgresMetrics
+ */
+export interface PostgresMetrics {
+  /** Number of successful reads from PostgreSQL layer */
+  postgresHits: number;
+  /** Number of failed reads from PostgreSQL layer */
+  postgresMisses: number;
+}
+
+/**
+ * All metrics including layer-specific and overall metrics
+ * 
+ * @interface AllMetrics
+ */
+export interface AllMetrics extends StorageMetrics {
+  /** Current number of entries in memory cache */
+  memorySize: number;
+  /** Maximum number of entries allowed in memory cache */
+  memoryMaxSize: number;
+  /** Cache hit ratio across all layers (0-1) */
+  cacheHitRatio: number;
+}
+
+/**
+ * Layer-specific metrics union type
+ * 
+ * @type LayerMetrics
+ */
+export type LayerMetrics = MemoryMetrics | RedisMetrics | PostgresMetrics | AllMetrics;
+
+/**
+ * Health check result for all layers
+ * 
+ * @interface AllLayersHealth
+ */
+export interface AllLayersHealth {
+  /** Memory layer health status */
+  memory: boolean;
+  /** Redis layer health status */
+  redis: boolean;
+  /** PostgreSQL layer health status */
+  postgres: boolean;
+}
+
+/**
+ * Health check result for memory layer only
+ * 
+ * @interface MemoryHealth
+ */
+export interface MemoryHealth {
+  /** Memory layer health status */
+  memory: boolean;
+}
+
+/**
+ * Health check result for Redis layer only
+ * 
+ * @interface RedisHealth
+ */
+export interface RedisHealth {
+  /** Redis layer health status */
+  redis: boolean;
+}
+
+/**
+ * Health check result for PostgreSQL layer only
+ * 
+ * @interface PostgresHealth
+ */
+export interface PostgresHealth {
+  /** PostgreSQL layer health status */
+  postgres: boolean;
+}
+
+/**
+ * Layer-specific health union type
+ * 
+ * @type LayerHealth
+ */
+export type LayerHealth = MemoryHealth | RedisHealth | PostgresHealth | AllLayersHealth;
+
+/**
  * Storage item metadata
  * 
  * Metadata associated with a stored item, including lifecycle information

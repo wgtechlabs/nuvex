@@ -276,7 +276,7 @@ describe('NuvexClient', () => {
       expect(health).toHaveProperty('redis');
       expect(health).toHaveProperty('postgres');
 
-      const metrics = await NuvexClient.getMetrics();
+      const metrics = NuvexClient.getMetrics();
       expect(metrics).toHaveProperty('totalOperations');
     });
   });

@@ -896,17 +896,11 @@ export class StorageEngine implements Storage {
   ): Record<string, number> {
     // If no layers specified or 'all' specified, return all metrics
     if (!layers || layers === 'all') {
-      const totalHits = this.metrics.memoryHits + this.metrics.redisHits + this.metrics.postgresHits;
-      const totalMisses = this.metrics.memoryMisses + this.metrics.redisMisses + this.metrics.postgresMisses;
-      const cacheHitRatio = totalHits + totalMisses > 0 
-        ? totalHits / (totalHits + totalMisses) 
-        : 0;
-      
       return {
         ...this.metrics,
         memorySize: this.l1Memory.size(),
         memoryMaxSize: this.l1Memory.getMaxSize(),
-        cacheHitRatio
+        cacheHitRatio: this.calculateCacheHitRatio()
       };
     }
     
@@ -1148,6 +1142,12 @@ export class StorageEngine implements Storage {
     const alpha = 0.2; // Smoothing factor (adjustable)
     this.metrics.averageResponseTime =
       alpha * duration + (1 - alpha) * this.metrics.averageResponseTime;
+  }
+  
+  private calculateCacheHitRatio(): number {
+    const totalHits = this.metrics.memoryHits + this.metrics.redisHits + this.metrics.postgresHits;
+    const totalMisses = this.metrics.memoryMisses + this.metrics.redisMisses + this.metrics.postgresMisses;
+    return totalHits + totalMisses > 0 ? totalHits / (totalHits + totalMisses) : 0;
   }
   
   private matchPattern(key: string, pattern: string): boolean {
