@@ -14,7 +14,7 @@ Reference: https://github.com/wgtechlabs/clean-commit
 
 ## Commit Message Format
 
-```
+```text
 <emoji> <type>: <description>
 <emoji> <type>(<scope>): <description>
 ```
