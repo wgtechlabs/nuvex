@@ -21,7 +21,6 @@ import { StorageEngine } from './engine.js';
 import type { 
   NuvexConfig,
   StorageOptions,
-  StorageMetrics,
   BatchOperation,
   BatchResult,
   QueryOptions,
@@ -416,8 +415,36 @@ export class NuvexClient implements IStore {
   }
   
   // Metrics and monitoring
-  getMetrics(): StorageMetrics {
-    return this.storage.getMetrics();
+  /**
+   * Get performance metrics for all layers or specific layer(s)
+   * 
+   * Returns metrics about storage operations and performance. Can be filtered
+   * to return metrics for specific layers only.
+   * 
+   * @param layers - Optional layer(s) to get metrics for. If not provided, returns all metrics.
+   *                 Can be a single layer string, 'all', or array of layer strings.
+   * @returns Object containing requested metrics
+   * 
+   * @example
+   * ```typescript
+   * // Get all metrics
+   * const metrics = client.getMetrics();
+   * 
+   * // Get specific layer metrics
+   * const memoryMetrics = client.getMetrics('memory');
+   * // { memoryHits, memoryMisses, memorySize, memoryMaxSize }
+   * 
+   * // Get multiple layer metrics
+   * const cacheMetrics = client.getMetrics(['memory', 'redis']);
+   * // { memoryHits, memoryMisses, memorySize, memoryMaxSize, redisHits, redisMisses, totalOperations, averageResponseTime, cacheHitRatio }
+   * ```
+   * 
+   * @since 1.0.0
+   */
+  getMetrics(
+    layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>
+  ): Record<string, number> {
+    return this.storage.getMetrics(layers);
   }
   
   resetMetrics(): void {
@@ -463,87 +490,40 @@ export class NuvexClient implements IStore {
   }
   
   /**
-   * Health check for all storage layers
+   * Health check for all storage layers or specific layer(s)
    * 
-   * Performs comprehensive health checks on all configured storage layers
-   * by executing test operations and verifying connectivity.
+   * Performs comprehensive health checks on configured storage layers
+   * using the underlying engine's ping() methods for each layer.
    * 
-   * @returns Promise that resolves to health status for each layer
+   * @param layers - Optional layer(s) to check. If not provided, checks all layers.
+   *                 Can be a single layer string or array of layer strings.
+   * @returns Promise that resolves to health status for requested layer(s)
    * 
    * @example
    * ```typescript
+   * // Check all layers
    * const health = await client.healthCheck();
-   * if (!health.overall) {
-   *   console.error('Storage issues detected:', {
-   *     memory: health.memory,
-   *     redis: health.redis, 
-   *     postgres: health.postgres
-   *   });
+   * // { memory: true, redis: true, postgres: true }
+   * 
+   * // Check specific layer
+   * const redisHealth = await client.healthCheck('redis');
+   * // { redis: true }
+   * 
+   * // Check multiple layers
+   * const cacheHealth = await client.healthCheck(['memory', 'redis']);
+   * // { memory: true, redis: true }
+   * 
+   * if (!health.redis) {
+   *   console.error('Redis layer is down');
    * }
    * ```
    * 
    * @since 1.0.0
    */
-  async healthCheck(): Promise<{
-    memory: boolean;
-    redis: boolean;
-    postgres: boolean;
-    overall: boolean;
-  }> {
-    const health = {
-      memory: true, // Memory cache is always available
-      redis: false,
-      postgres: false,
-      overall: false
-    };
-    
-    try {
-      // Test memory
-      const testKey = '__nuvex_health_check__';
-      const testValue = { timestamp: Date.now() };
-      
-      await this.storage.set(testKey, testValue, { ttl: 10 }); // 10 second TTL
-      const retrieved = await this.storage.get(testKey);
-      health.memory = retrieved !== null;
-      
-      // Clean up test key
-      await this.storage.delete(testKey);
-      
-      // Test Redis (if configured)
-      if (this.config.redis?.url) {
-        try {
-          await this.storage.set(`${testKey}_redis`, testValue, { ttl: 10 });
-          const redisRetrieved = await this.storage.get(`${testKey}_redis`);
-          health.redis = redisRetrieved !== null;
-          await this.storage.delete(`${testKey}_redis`);
-        } catch (error) {
-          this.log('warn', 'Redis health check failed', { error: (error as Error).message });
-          health.redis = false;
-        }
-      } else {
-        health.redis = true; // Not configured, so considered healthy
-      }
-      
-      // Test PostgreSQL
-      try {
-        await this.storage.set(`${testKey}_postgres`, testValue, { ttl: 10 });
-        const pgRetrieved = await this.storage.get(`${testKey}_postgres`);
-        health.postgres = pgRetrieved !== null;
-        await this.storage.delete(`${testKey}_postgres`);
-      } catch (error) {
-        this.log('warn', 'PostgreSQL health check failed', { error: (error as Error).message });
-        health.postgres = false;
-      }
-      
-      health.overall = health.memory && health.redis && health.postgres;
-      
-      this.log('info', 'Health check completed', health);
-      return health;
-      
-    } catch (error) {
-      this.log('error', 'Health check failed', { error: (error as Error).message });
-      return { memory: false, redis: false, postgres: false, overall: false };
-    }
+  async healthCheck(
+    layers?: 'memory' | 'redis' | 'postgres' | Array<'memory' | 'redis' | 'postgres'>
+  ): Promise<Record<string, boolean>> {
+    return this.storage.healthCheck(layers);
   }
   
   /**
@@ -1019,12 +999,16 @@ export class NuvexClient implements IStore {
     return NuvexClient.getInstance().exists(key, options);
   }
   
-  static async healthCheck() {
-    return NuvexClient.getInstance().healthCheck();
+  static async healthCheck(
+    layers?: 'memory' | 'redis' | 'postgres' | Array<'memory' | 'redis' | 'postgres'>
+  ) {
+    return NuvexClient.getInstance().healthCheck(layers);
   }
   
-  static async getMetrics(): Promise<StorageMetrics> {
-    return NuvexClient.getInstance().getMetrics();
+  static getMetrics(
+    layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>
+  ): Record<string, number> {
+    return NuvexClient.getInstance().getMetrics(layers);
   }
   
   /**
