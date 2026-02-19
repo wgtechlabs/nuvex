@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: wgtechlabs/package-build-flow-action@v1
+      - uses: wgtechlabs/package-build-flow-action@v2.0.1
         with:
           npm-token: ${{ secrets.NPM_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
