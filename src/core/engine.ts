@@ -687,18 +687,26 @@ export class StorageEngine implements Storage {
    * This method uses layer-specific atomic operations when available,
    * providing thread-safe increments across all storage layers.
    * 
+   * **Important:** The key must contain a numeric value (or not exist).
+   * If the key contains a non-numeric value, the operation will fail:
+   * - Redis: Throws error "value is not an integer"
+   * - PostgreSQL: Throws error during numeric cast
+   * - Memory: Treats non-numeric values as 0
+   * 
    * The increment cascades through layers:
-   * 1. If L3 (PostgreSQL) is available, use its atomic UPDATE
+   * 1. If L3 (PostgreSQL) is available, use its atomic UPSERT
    * 2. Else if L2 (Redis) is available, use INCRBY
    * 3. Else use L1 (Memory) increment
    * 
    * After incrementing in the authoritative layer, the new value is
    * propagated to higher layers for cache consistency.
    * 
-   * @param key - The key to increment
+   * @param key - The key to increment (must contain numeric value or not exist)
    * @param delta - The amount to increment by (default: 1)
    * @param ttl - Optional TTL in milliseconds
    * @returns Promise resolving to the new value after increment
+   * @throws {Error} If the key contains a non-numeric value (Redis/PostgreSQL)
+   * @throws {Error} If no storage layer is available
    * 
    * @example
    * ```typescript

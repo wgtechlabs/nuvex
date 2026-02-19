@@ -898,6 +898,9 @@ export class NuvexClient implements IStore {
    * - ✅ No lost updates in high-concurrency scenarios
    * - ✅ Works correctly across multiple instances
    * 
+   * **Important:** The key must contain a numeric value (or not exist).
+   * Incrementing a non-numeric value will throw an error.
+   * 
    * **How It Works:**
    * 1. Uses atomic increment at the authoritative layer (PostgreSQL or Redis)
    * 2. Propagates the new value to cache layers for consistency
@@ -907,8 +910,8 @@ export class NuvexClient implements IStore {
    * ```typescript
    * // ✅ SAFE: Concurrent increments work correctly
    * await Promise.all([
-   *   client.increment('counter'),  // reads 5, writes 6
-   *   client.increment('counter')   // reads 6, writes 7
+   *   client.increment('counter'),  // atomic: 5 → 6
+   *   client.increment('counter')   // atomic: 6 → 7
    * ]);
    * // Result: 7 (all increments counted correctly)
    * 
@@ -925,10 +928,11 @@ export class NuvexClient implements IStore {
    * - ✅ Financial operations requiring exactness
    * - ✅ Distributed systems with multiple instances
    * 
-   * @param key - The key to increment
+   * @param key - The key to increment (must contain numeric value or not exist)
    * @param delta - The amount to increment by (default: 1)
    * @param ttl - Optional TTL in milliseconds
    * @returns Promise resolving to the new value after increment
+   * @throws {Error} If the key contains a non-numeric value
    */
   async increment(key: string, delta = 1, ttl?: number): Promise<number> {
     return this.storage.increment(key, delta, ttl);

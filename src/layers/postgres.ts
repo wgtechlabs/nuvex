@@ -497,30 +497,30 @@ export class PostgresStorage implements StorageLayerInterface {
     try {
       const expiresAt = ttlSeconds ? new Date(Date.now() + (ttlSeconds * 1000)) : null;
       
-      // Try to update existing key
-      const updateResult = await this.pool.query(
-        `UPDATE ${this.tableName} 
-         SET ${this.valueColumn} = to_jsonb((${this.valueColumn}::text)::numeric + $1),
-             expires_at = $2,
-             updated_at = NOW()
-         WHERE ${this.keyColumn} = $3 
-         AND (expires_at IS NULL OR expires_at > NOW())
-         RETURNING (${this.valueColumn}::text)::numeric as value`,
-        [delta, expiresAt, key]
-      );
-
-      if (updateResult.rows.length > 0) {
-        return Number(updateResult.rows[0].value);
-      }
-
-      // Key doesn't exist, insert with delta as initial value
-      await this.pool.query(
+      // Atomic upsert to handle both insert and update cases
+      // This avoids race conditions when multiple concurrent increments happen on non-existent keys
+      const result = await this.pool.query(
         `INSERT INTO ${this.tableName} (${this.keyColumn}, ${this.valueColumn}, expires_at)
          VALUES ($1, to_jsonb($2), $3)
-         ON CONFLICT (${this.keyColumn}) DO NOTHING`,
+         ON CONFLICT (${this.keyColumn}) DO UPDATE
+           SET ${this.valueColumn} = to_jsonb(
+                 CASE 
+                   WHEN ${this.tableName}.expires_at IS NULL OR ${this.tableName}.expires_at > NOW()
+                   THEN (${this.tableName}.${this.valueColumn}::text)::numeric + (EXCLUDED.${this.valueColumn}::text)::numeric
+                   ELSE (EXCLUDED.${this.valueColumn}::text)::numeric
+                 END
+               ),
+               expires_at = EXCLUDED.expires_at,
+               updated_at = NOW()
+         RETURNING (${this.valueColumn}::text)::numeric as value`,
         [key, delta, expiresAt]
       );
 
+      if (result.rows.length > 0) {
+        return Number(result.rows[0].value);
+      }
+
+      // Fallback: should not reach here, but return delta if no rows returned
       return delta;
     } catch (error) {
       this.log('error', `PostgreSQL L3: Error incrementing key: ${key}`, { 
