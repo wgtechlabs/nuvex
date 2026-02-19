@@ -98,6 +98,8 @@ export interface Storage {
   exists(key: string, options: StorageOptions): Promise<boolean>;
   /** Set or update expiration time for a key */
   expire(key: string, ttl: number): Promise<boolean>;
+  /** Atomically increment a numeric value */
+  increment(key: string, delta?: number, ttl?: number): Promise<number>;
 
   // Batch operations
   
@@ -243,6 +245,19 @@ export interface StorageLayerInterface {
    * @returns Promise resolving to true if the layer is healthy and operational
    */
   ping(): Promise<boolean>;
+  
+  /**
+   * Atomically increment a numeric value
+   * 
+   * This operation is thread-safe and prevents race conditions.
+   * If the key doesn't exist, it's initialized to 0 before incrementing.
+   * 
+   * @param key - The key to increment
+   * @param delta - The amount to increment by (can be negative for decrement)
+   * @param ttlSeconds - Optional TTL in seconds for the key
+   * @returns Promise resolving to the new value after increment
+   */
+  increment?(key: string, delta: number, ttlSeconds?: number): Promise<number>;
 }
 
 // ===== Cache Interface =====

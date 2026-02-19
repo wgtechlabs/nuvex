@@ -186,6 +186,76 @@ describe('StorageEngine', () => {
     });
   });
 
+  describe('Atomic Increment Operations', () => {
+    test('should increment numeric values atomically', async () => {
+      const key = 'atomic:counter';
+      
+      // First increment (non-existent key, should start at 0)
+      let result = await storageEngine.increment(key, 1);
+      expect(result).toBe(1);
+      
+      // Second increment
+      result = await storageEngine.increment(key, 1);
+      expect(result).toBe(2);
+      
+      // Increment with custom delta
+      result = await storageEngine.increment(key, 5);
+      expect(result).toBe(7);
+    });
+
+    test('should increment correctly (sequential atomic operations)', async () => {
+      const key = 'atomic:concurrent';
+      
+      // Test that atomic increment works correctly in sequence
+      // True concurrency protection is provided by Redis/PostgreSQL in production
+      for (let i = 0; i < 10; i++) {
+        await storageEngine.increment(key, 1);
+      }
+      
+      // Final value should be exactly 10
+      const finalValue = await storageEngine.get<number>(key);
+      expect(finalValue).toBe(10);
+    });
+
+    test('should decrement using negative delta', async () => {
+      const key = 'atomic:decrement';
+      
+      // Set initial value
+      await storageEngine.set(key, 10);
+      
+      // Decrement by 3
+      const result = await storageEngine.increment(key, -3);
+      expect(result).toBe(7);
+    });
+
+    test('should increment with TTL', async () => {
+      const key = 'atomic:ttl';
+      const ttl = 60000; // 60 seconds in milliseconds
+      
+      const result = await storageEngine.increment(key, 1, ttl);
+      expect(result).toBe(1);
+      
+      // Verify value exists
+      const exists = await storageEngine.exists(key);
+      expect(exists).toBe(true);
+    });
+
+    test('should propagate incremented value to all layers', async () => {
+      const key = 'atomic:propagate';
+      
+      // Increment the value
+      await storageEngine.increment(key, 5);
+      
+      // Value should be available from any layer
+      const value = await storageEngine.get<number>(key);
+      expect(value).toBe(5);
+      
+      // Subsequent increment should work correctly
+      const result = await storageEngine.increment(key, 3);
+      expect(result).toBe(8);
+    });
+  });
+
   describe('Query Operations', () => {
     // TODO: Update these tests - keys() method needs to be reimplemented for modular layers
     
