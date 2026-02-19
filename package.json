@@ -1,6 +1,6 @@
 {
   "name": "nuvex",
-  "version": "1.0.0-beta",
+  "version": "0.1.0",
   "description": "Next-gen Unified Vault Experience - A minimalist SDK for structured memory layering in Redis and PostgreSQL",
   "type": "module",
   "main": "dist/cjs/index.js",
