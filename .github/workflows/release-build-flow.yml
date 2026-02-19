@@ -1,0 +1,21 @@
+name: Release Build Flow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Release
+        uses: wgtechlabs/release-build-flow-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
