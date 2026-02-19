@@ -680,6 +680,96 @@ export class StorageEngine implements Storage {
       return false;
     }
   }
+
+  /**
+   * Atomically increment a numeric value
+   * 
+   * This method uses layer-specific atomic operations when available,
+   * providing thread-safe increments across all storage layers.
+   * 
+   * The increment cascades through layers:
+   * 1. If L3 (PostgreSQL) is available, use its atomic UPDATE
+   * 2. Else if L2 (Redis) is available, use INCRBY
+   * 3. Else use L1 (Memory) increment
+   * 
+   * After incrementing in the authoritative layer, the new value is
+   * propagated to higher layers for cache consistency.
+   * 
+   * @param key - The key to increment
+   * @param delta - The amount to increment by (default: 1)
+   * @param ttl - Optional TTL in milliseconds
+   * @returns Promise resolving to the new value after increment
+   * 
+   * @example
+   * ```typescript
+   * // Increment counter by 1
+   * const newValue = await engine.increment('page_views');
+   * 
+   * // Increment with custom delta
+   * const credits = await engine.increment('user:credits', 10);
+   * 
+   * // Decrement (negative delta)
+   * const remaining = await engine.increment('inventory', -1);
+   * ```
+   */
+  async increment(key: string, delta = 1, ttl?: number): Promise<number> {
+    const startTime = Date.now();
+    const ttlSeconds = ttl ? Math.floor(ttl / 1000) : undefined;
+    let newValue: number;
+
+    try {
+      // Use atomic increment from the most authoritative layer available
+      if (this.l3Postgres?.increment) {
+        newValue = await this.l3Postgres.increment(key, delta, ttlSeconds);
+        this.recordMetric('postgres', 'increment');
+        
+        // Propagate to upper layers for cache consistency
+        if (this.l2Redis) {
+          await this.l2Redis.set(key, newValue, ttlSeconds);
+        }
+        if (this.l1Memory) {
+          await this.l1Memory.set(key, newValue, ttlSeconds);
+        }
+      } else if (this.l2Redis?.increment) {
+        newValue = await this.l2Redis.increment(key, delta, ttlSeconds);
+        this.recordMetric('redis', 'increment');
+        
+        // Propagate to memory layer
+        if (this.l1Memory) {
+          await this.l1Memory.set(key, newValue, ttlSeconds);
+        }
+      } else if (this.l1Memory?.increment) {
+        newValue = await this.l1Memory.increment(key, delta, ttlSeconds);
+        this.recordMetric('memory', 'increment');
+      } else {
+        throw new Error('No storage layer available for increment operation');
+      }
+
+      const duration = Date.now() - startTime;
+      this.log('debug', `Incremented ${key} by ${delta}`, {
+        operation: 'increment',
+        key,
+        delta,
+        newValue,
+        duration,
+        success: true
+      });
+
+      return newValue;
+    } catch (error) {
+      const err = error as Error;
+      const duration = Date.now() - startTime;
+      this.log('error', `Error incrementing ${key}`, {
+        error: err.message,
+        operation: 'increment',
+        key,
+        delta,
+        duration,
+        success: false
+      });
+      throw error;
+    }
+  }
   
   // Batch operations
   async setBatch(operations: BatchOperation[]): Promise<BatchResult[]> {

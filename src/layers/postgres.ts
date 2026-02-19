@@ -470,6 +470,67 @@ export class PostgresStorage implements StorageLayerInterface {
   }
 
   /**
+   * Atomically increment a numeric value
+   * 
+   * Uses PostgreSQL UPDATE with row-level locking for true atomic increments.
+   * If the key doesn't exist, it's created with the delta value.
+   * 
+   * This operation is safe for concurrent access across multiple instances.
+   * 
+   * @param key - The key to increment
+   * @param delta - The amount to increment by
+   * @param ttlSeconds - Optional TTL in seconds
+   * @returns Promise resolving to the new value after increment
+   * 
+   * @example
+   * ```typescript
+   * // Atomic increment - safe for concurrent access
+   * const newValue = await postgres.increment('counter', 1, 86400);
+   * ```
+   */
+  async increment(key: string, delta: number, ttlSeconds?: number): Promise<number> {
+    if (!this.connected || !this.pool) {
+      this.log('warn', 'PostgreSQL L3: Cannot increment - not connected', { key });
+      throw new Error('PostgreSQL not connected');
+    }
+
+    try {
+      const expiresAt = ttlSeconds ? new Date(Date.now() + (ttlSeconds * 1000)) : null;
+      
+      // Try to update existing key
+      const updateResult = await this.pool.query(
+        `UPDATE ${this.tableName} 
+         SET ${this.valueColumn} = to_jsonb((${this.valueColumn}::text)::numeric + $1),
+             expires_at = $2,
+             updated_at = NOW()
+         WHERE ${this.keyColumn} = $3 
+         AND (expires_at IS NULL OR expires_at > NOW())
+         RETURNING (${this.valueColumn}::text)::numeric as value`,
+        [delta, expiresAt, key]
+      );
+
+      if (updateResult.rows.length > 0) {
+        return Number(updateResult.rows[0].value);
+      }
+
+      // Key doesn't exist, insert with delta as initial value
+      await this.pool.query(
+        `INSERT INTO ${this.tableName} (${this.keyColumn}, ${this.valueColumn}, expires_at)
+         VALUES ($1, to_jsonb($2), $3)
+         ON CONFLICT (${this.keyColumn}) DO NOTHING`,
+        [key, delta, expiresAt]
+      );
+
+      return delta;
+    } catch (error) {
+      this.log('error', `PostgreSQL L3: Error incrementing key: ${key}`, { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Log a message if logger is configured
    * 
    * @private

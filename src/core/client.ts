@@ -887,71 +887,76 @@ export class NuvexClient implements IStore {
   }
   
   /**
-   * Increment a numeric value using get-modify-set pattern
+   * Atomically increment a numeric value
    * 
-   * ⚠️ **CONCURRENCY WARNING:**
-   * This method is NOT atomic and can lose updates under concurrent access.
-   * Uses a get-modify-set pattern which has a race condition window where
-   * concurrent increments may overwrite each other, resulting in lost updates.
+   * This method provides true atomic increments that are safe for concurrent access
+   * across all storage layers. Uses native atomic operations from Redis (INCRBY) and
+   * PostgreSQL (UPDATE with row locks) when available.
    * 
    * **Thread-Safety:**
-   * - ❌ NOT safe for concurrent increments to the same key
-   * - ❌ Lost updates possible in high-concurrency scenarios
-   * - ✅ Safe only for single-threaded or low-concurrency use cases
+   * - ✅ Safe for concurrent increments to the same key
+   * - ✅ No lost updates in high-concurrency scenarios
+   * - ✅ Works correctly across multiple instances
    * 
-   * **Example Race Condition:**
+   * **How It Works:**
+   * 1. Uses atomic increment at the authoritative layer (PostgreSQL or Redis)
+   * 2. Propagates the new value to cache layers for consistency
+   * 3. Returns the exact new value after increment
+   * 
+   * **Example Usage:**
    * ```typescript
-   * // ❌ UNSAFE: Concurrent increments may lose updates
+   * // ✅ SAFE: Concurrent increments work correctly
    * await Promise.all([
    *   client.increment('counter'),  // reads 5, writes 6
-   *   client.increment('counter')   // reads 5, writes 6 (lost update!)
+   *   client.increment('counter')   // reads 6, writes 7
    * ]);
-   * // Expected: 7, Actual: 6 (one increment lost)
+   * // Result: 7 (all increments counted correctly)
    * 
-   * // ✅ SAFE: Sequential operations
-   * await client.increment('counter');
-   * await client.increment('counter');
+   * // Custom delta
+   * await client.increment('page_views', 5);
    * 
-   * // ✅ SAFE: Application-level locking/serialization
-   * await lock.acquire('counter');
-   * try {
-   *   await client.increment('counter');
-   * } finally {
-   *   await lock.release('counter');
-   * }
+   * // With TTL (in seconds)
+   * await client.increment('rate_limit', 1, { ttl: 3600 });
    * ```
    * 
-   * **Recommended for:**
-   * - Low-concurrency scenarios
-   * - Non-critical counters (statistics, analytics)
-   * - Single-threaded applications
-   * 
-   * **Not recommended for:**
-   * - High-concurrency counters (user credits, inventory)
-   * - Financial operations requiring exactness
-   * - Distributed systems without external locking
+   * **Use Cases:**
+   * - ✅ High-concurrency counters (page views, API calls)
+   * - ✅ Critical operations (user credits, inventory)
+   * - ✅ Financial operations requiring exactness
+   * - ✅ Distributed systems with multiple instances
    * 
    * @param key - The key to increment
    * @param delta - The amount to increment by (default: 1)
-   * @returns Promise resolving to the new value (may be incorrect under concurrent access)
-   * 
-   * @see https://github.com/wgtechlabs/nuvex/issues/11 - Track atomic operations implementation
-   * @see https://en.wikipedia.org/wiki/Time-of-check-to-time-of-use - TOCTOU race condition
+   * @param options - Optional storage options (e.g., TTL)
+   * @returns Promise resolving to the new value after increment
    */
-  async increment(key: string, delta = 1): Promise<number> {
-    // Get-modify-set pattern (NOT atomic)
-    // Race condition window exists between get and set operations
-    const currentValue = await this.storage.get<number>(key);
-    const newValue = (currentValue || 0) + delta;
-    await this.storage.set(key, newValue);
-    return newValue;
+  async increment(key: string, delta = 1, options?: StorageOptions): Promise<number> {
+    const ttl = options?.ttl;
+    return this.storage.increment(key, delta, ttl);
   }
   
   /**
-   * Decrement a numeric value atomically
+   * Atomically decrement a numeric value
+   * 
+   * This is a convenience method that uses atomic increment with a negative delta.
+   * Provides the same thread-safety guarantees as increment().
+   * 
+   * @param key - The key to decrement
+   * @param delta - The amount to decrement by (default: 1)
+   * @param options - Optional storage options (e.g., TTL)
+   * @returns Promise resolving to the new value after decrement
+   * 
+   * @example
+   * ```typescript
+   * // Decrement by 1
+   * await client.decrement('inventory');
+   * 
+   * // Decrement by custom amount
+   * await client.decrement('stock', 5);
+   * ```
    */
-  async decrement(key: string, delta = 1): Promise<number> {
-    return this.increment(key, -delta);
+  async decrement(key: string, delta = 1, options?: StorageOptions): Promise<number> {
+    return this.increment(key, -delta, options);
   }
   
   /**

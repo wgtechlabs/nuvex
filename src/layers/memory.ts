@@ -330,6 +330,46 @@ export class MemoryStorage implements StorageLayerInterface {
   }
 
   /**
+   * Atomically increment a numeric value
+   * 
+   * This operation is thread-safe for single-instance deployments.
+   * If the key doesn't exist or is expired, it's initialized to 0 before incrementing.
+   * 
+   * @param key - The key to increment
+   * @param delta - The amount to increment by (can be negative for decrement)
+   * @param ttlSeconds - Optional TTL in seconds
+   * @returns Promise resolving to the new value after increment
+   * 
+   * @example
+   * ```typescript
+   * const newValue = await memory.increment('counter', 1, 60);
+   * console.log(`Counter is now: ${newValue}`);
+   * ```
+   */
+  async increment(key: string, delta: number, ttlSeconds?: number): Promise<number> {
+    const entry = this.cache.get(key);
+    
+    // Check if entry exists and is not expired
+    let currentValue = 0;
+    if (entry) {
+      if (entry.expires && Date.now() > entry.expires) {
+        // Expired entry, treat as non-existent
+        this.cache.delete(key);
+      } else {
+        currentValue = typeof entry.value === 'number' ? entry.value : 0;
+      }
+    }
+    
+    // Calculate new value
+    const newValue = currentValue + delta;
+    
+    // Store the new value (this also handles LRU eviction if needed)
+    await this.set(key, newValue, ttlSeconds);
+    
+    return newValue;
+  }
+
+  /**
    * Log a message if logger is configured
    * 
    * @private

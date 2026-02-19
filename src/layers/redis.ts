@@ -358,6 +358,47 @@ export class RedisStorage implements StorageLayerInterface {
   }
 
   /**
+   * Atomically increment a numeric value
+   * 
+   * Uses Redis INCRBY command for true atomic increments that are safe
+   * across multiple instances and concurrent requests.
+   * 
+   * @param key - The key to increment
+   * @param delta - The amount to increment by
+   * @param ttlSeconds - Optional TTL in seconds
+   * @returns Promise resolving to the new value after increment
+   * 
+   * @example
+   * ```typescript
+   * // Atomic increment - safe for concurrent access
+   * const newValue = await redis.increment('counter', 1, 3600);
+   * ```
+   */
+  async increment(key: string, delta: number, ttlSeconds?: number): Promise<number> {
+    if (!this.connected || !this.client) {
+      this.log('warn', 'Redis L2: Cannot increment - not connected', { key });
+      throw new Error('Redis not connected');
+    }
+
+    try {
+      // Use INCRBY for atomic increment
+      const newValue = await this.client.incrBy(key, delta);
+      
+      // Set TTL if specified
+      if (ttlSeconds) {
+        await this.client.expire(key, ttlSeconds);
+      }
+      
+      return newValue;
+    } catch (error) {
+      this.log('error', `Redis L2: Error incrementing key: ${key}`, { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Log a message if logger is configured
    * 
    * @private
