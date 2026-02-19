@@ -721,7 +721,7 @@ export class StorageEngine implements Storage {
       // Use atomic increment from the most authoritative layer available
       if (this.l3Postgres?.increment) {
         newValue = await this.l3Postgres.increment(key, delta, ttlSeconds);
-        this.recordMetric('postgres', 'increment');
+        this.metrics.totalOperations++;
         
         // Propagate to upper layers for cache consistency
         if (this.l2Redis) {
@@ -732,7 +732,7 @@ export class StorageEngine implements Storage {
         }
       } else if (this.l2Redis?.increment) {
         newValue = await this.l2Redis.increment(key, delta, ttlSeconds);
-        this.recordMetric('redis', 'increment');
+        this.metrics.totalOperations++;
         
         // Propagate to memory layer
         if (this.l1Memory) {
@@ -740,7 +740,7 @@ export class StorageEngine implements Storage {
         }
       } else if (this.l1Memory?.increment) {
         newValue = await this.l1Memory.increment(key, delta, ttlSeconds);
-        this.recordMetric('memory', 'increment');
+        this.metrics.totalOperations++;
       } else {
         throw new Error('No storage layer available for increment operation');
       }

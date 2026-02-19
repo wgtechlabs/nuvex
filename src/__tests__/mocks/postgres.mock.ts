@@ -57,6 +57,25 @@ export class MockPgClient {
         const [key, value, expiresAt] = params;
         const table = this.tables.get('nuvex_storage') || new Map();
         
+        // Handle ON CONFLICT DO NOTHING (used by increment when key doesn't exist)
+        if (sql.includes('do nothing')) {
+          // Only insert if key doesn't exist
+          if (!table.has(key)) {
+            const record = {
+              key,
+              value: typeof value === 'number' ? JSON.stringify(value) : value,
+              expires_at: expiresAt,
+              created_at: new Date(),
+              updated_at: new Date()
+            };
+            
+            table.set(key, record);
+            this.tables.set('nuvex_storage', table);
+            return { rows: [record], rowCount: 1, command: 'INSERT' };
+          }
+          return { rows: [], rowCount: 0, command: 'INSERT' };
+        }
+        
         // Handle atomic increment operations
         if (sql.includes('coalesce(cast(nuvex_storage.value as numeric)')) {
           const existingRecord = table.get(key);
@@ -130,6 +149,57 @@ export class MockPgClient {
       }
       
       return { rows: [], rowCount: 0, command: 'DELETE' };
+    }
+    
+    // Handle UPDATE for atomic increment
+    if (sql.includes('update nuvex_storage') && sql.includes('returning')) {
+      const table = this.tables.get('nuvex_storage') || new Map();
+      
+      if (params && params.length >= 3) {
+        const [delta, expiresAt, key] = params;
+        const existingRecord = table.get(key);
+        
+        if (existingRecord) {
+          // Check if record has expired
+          if (existingRecord.expires_at) {
+            const nowUtc = new Date(Date.now());
+            const expiresAtUtc = new Date(existingRecord.expires_at);
+            if (nowUtc.getTime() > expiresAtUtc.getTime()) {
+              table.delete(key);
+              return { rows: [], rowCount: 0, command: 'UPDATE' };
+            }
+          }
+          
+          // Parse the current numeric value from JSONB
+          let currentValue = 0;
+          try {
+            const parsed = typeof existingRecord.value === 'string' 
+              ? JSON.parse(existingRecord.value)
+              : existingRecord.value;
+            currentValue = typeof parsed === 'number' ? parsed : 0;
+          } catch {
+            currentValue = 0;
+          }
+          
+          const newValue = currentValue + Number(delta);
+          
+          const record = {
+            ...existingRecord,
+            value: JSON.stringify(newValue),
+            expires_at: expiresAt,
+            updated_at: new Date()
+          };
+          
+          table.set(key, record);
+          this.tables.set('nuvex_storage', table);
+          return { rows: [{ value: newValue }], rowCount: 1, command: 'UPDATE' };
+        }
+        
+        // Key doesn't exist
+        return { rows: [], rowCount: 0, command: 'UPDATE' };
+      }
+      
+      return { rows: [], rowCount: 0, command: 'UPDATE' };
     }
     
     // Handle generic SELECT for other operations

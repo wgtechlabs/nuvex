@@ -915,8 +915,8 @@ export class NuvexClient implements IStore {
    * // Custom delta
    * await client.increment('page_views', 5);
    * 
-   * // With TTL (in seconds)
-   * await client.increment('rate_limit', 1, { ttl: 3600 });
+   * // With TTL (in milliseconds)
+   * await client.increment('rate_limit', 1, 3600000);
    * ```
    * 
    * **Use Cases:**
@@ -927,11 +927,10 @@ export class NuvexClient implements IStore {
    * 
    * @param key - The key to increment
    * @param delta - The amount to increment by (default: 1)
-   * @param options - Optional storage options (e.g., TTL)
+   * @param ttl - Optional TTL in milliseconds
    * @returns Promise resolving to the new value after increment
    */
-  async increment(key: string, delta = 1, options?: StorageOptions): Promise<number> {
-    const ttl = options?.ttl;
+  async increment(key: string, delta = 1, ttl?: number): Promise<number> {
     return this.storage.increment(key, delta, ttl);
   }
   
@@ -943,7 +942,7 @@ export class NuvexClient implements IStore {
    * 
    * @param key - The key to decrement
    * @param delta - The amount to decrement by (default: 1)
-   * @param options - Optional storage options (e.g., TTL)
+   * @param ttl - Optional TTL in milliseconds
    * @returns Promise resolving to the new value after decrement
    * 
    * @example
@@ -955,8 +954,8 @@ export class NuvexClient implements IStore {
    * await client.decrement('stock', 5);
    * ```
    */
-  async decrement(key: string, delta = 1, options?: StorageOptions): Promise<number> {
-    return this.increment(key, -delta, options);
+  async decrement(key: string, delta = 1, ttl?: number): Promise<number> {
+    return this.increment(key, -delta, ttl);
   }
   
   /**
