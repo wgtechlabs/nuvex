@@ -528,6 +528,95 @@ describe('NuvexClient', () => {
       expect(result).toBe(6);
     });
 
+    test('should handle concurrent increments atomically', async () => {
+      const key = 'concurrent_counter';
+      
+      // Perform concurrent increments
+      const results = await Promise.all([
+        client.increment(key),
+        client.increment(key),
+        client.increment(key),
+        client.increment(key),
+        client.increment(key)
+      ]);
+      
+      // All increments should return different values
+      const uniqueResults = new Set(results);
+      expect(uniqueResults.size).toBe(5);
+      
+      // Final value should be exactly 5 (no lost updates)
+      const finalValue = await client.get<number>(key);
+      expect(finalValue).toBe(5);
+    });
+
+    test('should handle concurrent increments with custom delta', async () => {
+      const key = 'concurrent_delta';
+      
+      // Perform concurrent increments with delta of 3
+      await Promise.all([
+        client.increment(key, 3),
+        client.increment(key, 3),
+        client.increment(key, 3)
+      ]);
+      
+      // Final value should be exactly 9 (3 * 3)
+      const finalValue = await client.get<number>(key);
+      expect(finalValue).toBe(9);
+    });
+
+    test('should handle concurrent mixed increment and decrement', async () => {
+      const key = 'concurrent_mixed';
+      
+      // Set initial value
+      await client.set(key, 10);
+      
+      // Perform concurrent operations
+      await Promise.all([
+        client.increment(key, 5),   // +5 = 15
+        client.decrement(key, 3),   // -3 = 12
+        client.increment(key, 2),   // +2 = 14
+        client.decrement(key, 1)    // -1 = 13
+      ]);
+      
+      // Final value should be 10 + 5 - 3 + 2 - 1 = 13
+      const finalValue = await client.get<number>(key);
+      expect(finalValue).toBe(13);
+    });
+
+    test('should increment with TTL option', async () => {
+      const key = 'counter_with_ttl';
+      
+      // Increment with TTL
+      const result = await client.increment(key, 1, { ttl: 3600000 }); // 1 hour
+      expect(result).toBe(1);
+      
+      // Key should exist
+      const exists = await client.exists(key);
+      expect(exists).toBe(true);
+      
+      // Value should be correct
+      const value = await client.get<number>(key);
+      expect(value).toBe(1);
+    });
+
+    test('should initialize non-existent key to 0 before increment', async () => {
+      const key = 'new_counter';
+      
+      // First increment on non-existent key
+      const result = await client.increment(key);
+      expect(result).toBe(1);
+    });
+
+    test('should handle negative increment (same as decrement)', async () => {
+      const key = 'negative_increment';
+      
+      await client.set(key, 10);
+      
+      // Negative increment
+      const result = await client.increment(key, -3);
+      expect(result).toBe(7);
+    });
+
     test('should set if not exists', async () => {
       const key = 'conditional';
       const value = { data: 'conditional' };
