@@ -37,7 +37,7 @@
  * ## Quick Start Example
  * 
  * ```typescript
- * import { NuvexClient } from 'nuvex';
+ * import { NuvexClient } from '@wgtechlabs/nuvex';
  * 
  * const client = new NuvexClient({
  *   memory: { ttl: 3600000, maxSize: 10000 },
