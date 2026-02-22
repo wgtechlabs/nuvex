@@ -3,6 +3,7 @@
  * Tests for custom table and column name configuration
  */
 
+import type { Pool as PoolType } from 'pg';
 import { PostgresStorage } from '../../layers/postgres';
 import { generateNuvexSchemaSQL } from '../../core/database';
 import type { PostgresSchemaConfig } from '../../types/index';
@@ -231,11 +232,11 @@ describe('PostgreSQL Configurable Schema', () => {
 
   describe('PostgresStorage with custom schema', () => {
     // Mock the pg.Pool constructor
-    let PoolMock: jest.Mock;
+    let _poolMock: jest.Mock;
     
     beforeEach(() => {
       // Create a mock Pool constructor
-      PoolMock = jest.fn().mockImplementation(() => ({
+      _poolMock = jest.fn().mockImplementation(() => ({
         query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
         connect: jest.fn().mockResolvedValue({
           query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -255,7 +256,7 @@ describe('PostgreSQL Configurable Schema', () => {
         end: jest.fn()
       };
       
-      const storage = new PostgresStorage(mockPool);
+      const storage = new PostgresStorage(mockPool as unknown as PoolType);
       await storage.connect();
       
       // Test get operation
