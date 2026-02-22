@@ -14,7 +14,6 @@
  * - Health monitoring with SELECT 1 queries
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 
@@ -22,6 +21,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import type { Pool as PoolType } from 'pg';
 import type { StorageLayerInterface, Logger } from '../interfaces/index.js';
+import type { PostgresConfig } from '../types/index.js';
 import { validateSQLIdentifier } from '../core/database.js';
 
 /**
@@ -88,7 +88,7 @@ export class PostgresStorage implements StorageLayerInterface {
   private pool: PoolType | null;
   
   /** Database configuration or existing pool */
-  private readonly config: any;
+  private readonly config: PostgresConfig | PoolType;
   
   /** Whether the pool is connected */
   private connected: boolean;
@@ -139,8 +139,7 @@ export class PostgresStorage implements StorageLayerInterface {
    * const postgres = new PostgresStorage(existingPool);
    * ```
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(config: any, logger: Logger | null = null) {
+  constructor(config: PostgresConfig | PoolType, logger: Logger | null = null) {
     this.config = config;
     this.pool = null;
     this.connected = false;
@@ -151,7 +150,7 @@ export class PostgresStorage implements StorageLayerInterface {
     
     // Extract schema configuration with defaults
     // Note: Schema is only extracted from config objects, not from existing Pool instances
-    const schema = this.ownsPool ? config.schema : undefined;
+    const schema = this.ownsPool ? (config as PostgresConfig).schema : undefined;
     this.tableName = schema?.tableName ?? 'nuvex_storage';
     this.keyColumn = schema?.columns?.key ?? 'nuvex_key';
     this.valueColumn = schema?.columns?.value ?? 'nuvex_data';
@@ -184,7 +183,7 @@ export class PostgresStorage implements StorageLayerInterface {
     try {
       if (this.ownsPool) {
         // Create new pool from config
-        this.pool = new Pool(this.config);
+        this.pool = new Pool(this.config as PostgresConfig);
       } else {
         // Use existing pool
         this.pool = this.config as PoolType;
