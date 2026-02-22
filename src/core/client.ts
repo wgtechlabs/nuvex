@@ -14,7 +14,6 @@
  * - Backup and restore capabilities
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 import { StorageEngine } from './engine.js';
@@ -61,12 +60,11 @@ import type { Store as IStore, Logger } from '../interfaces/index.js';
  * @class NuvexClient
  * @implements {IStore}
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 export class NuvexClient implements IStore {
   private static instance: NuvexClient | null = null;
-  public storage: StorageEngine;
+  private storage: StorageEngine;
   private config: NuvexConfig;
   private logger: Logger | null;
   constructor(config: NuvexConfig) {
@@ -483,6 +481,18 @@ export class NuvexClient implements IStore {
   }
   
   /**
+   * Get the underlying storage engine
+   * 
+   * @internal This method is intended for internal and testing use only.
+   * It provides direct access to the StorageEngine instance.
+   * 
+   * @returns The StorageEngine instance used by this client
+   */
+  getEngine(): StorageEngine {
+    return this.storage;
+  }
+
+  /**
    * Get current configuration
    */
   getConfig(): NuvexConfig {
@@ -663,9 +673,7 @@ export class NuvexClient implements IStore {
         const backupDir = path.join(process.cwd(), 'nuvex-backups');
         
         // Ensure backup directory exists
-        if (!fs.existsSync(backupDir)) {
-          fs.mkdirSync(backupDir, { recursive: true });
-        }
+        await fs.promises.mkdir(backupDir, { recursive: true });
         
         const backupFilePath = path.join(backupDir, `${backupId}.json`);
         const dataToWrite = JSON.stringify(backupPackage, null, 2);
@@ -675,14 +683,14 @@ export class NuvexClient implements IStore {
           try {
             const zlib = await import('zlib');
             const compressed = zlib.gzipSync(Buffer.from(dataToWrite));
-            fs.writeFileSync(`${backupFilePath}.gz`, compressed);
+            await fs.promises.writeFile(`${backupFilePath}.gz`, compressed);
             this.log('info', `Backup compressed and saved to ${backupFilePath}.gz`);
           } catch (compressionError) {
             this.log('warn', 'Compression failed, saving uncompressed', { error: (compressionError as Error).message });
-            fs.writeFileSync(backupFilePath, dataToWrite);
+            await fs.promises.writeFile(backupFilePath, dataToWrite);
           }
         } else {
-          fs.writeFileSync(backupFilePath, dataToWrite);
+          await fs.promises.writeFile(backupFilePath, dataToWrite);
         }
         
         // Update last backup metadata for incremental backups
@@ -736,10 +744,11 @@ export class NuvexClient implements IStore {
         const compressedFilePath = `${backupFilePath}.gz`;
         
         // Try compressed file first
-        if (fs.existsSync(compressedFilePath)) {
+        const compressedExists = await fs.promises.access(compressedFilePath).then(() => true).catch(() => false);
+        if (compressedExists) {
           try {
             const zlib = await import('zlib');
-            const compressedData = fs.readFileSync(compressedFilePath);
+            const compressedData = await fs.promises.readFile(compressedFilePath);
             const decompressed = zlib.gunzipSync(compressedData);
             backupPackage = JSON.parse(decompressed.toString());
             this.log('info', 'Loaded compressed backup file');
@@ -747,10 +756,13 @@ export class NuvexClient implements IStore {
             this.log('error', 'Failed to decompress backup file', { error: (decompressionError as Error).message });
             throw decompressionError;
           }
-        } else if (fs.existsSync(backupFilePath)) {
-          const backupData = fs.readFileSync(backupFilePath, 'utf8');
-          backupPackage = JSON.parse(backupData);
-          this.log('info', 'Loaded uncompressed backup file');
+        } else {
+          const uncompressedExists = await fs.promises.access(backupFilePath).then(() => true).catch(() => false);
+          if (uncompressedExists) {
+            const backupData = await fs.promises.readFile(backupFilePath, 'utf8');
+            backupPackage = JSON.parse(backupData);
+            this.log('info', 'Loaded uncompressed backup file');
+          }
         }
       }
       
@@ -964,6 +976,28 @@ export class NuvexClient implements IStore {
   
   /**
    * Set if not exists
+   * 
+   * Stores a value only if the key does not already exist. Useful for
+   * initializing values that should not be overwritten.
+   * 
+   * @note This implementation uses a check-then-set pattern which has a
+   * TOCTOU (Time-of-Check to Time-of-Use) race condition. Between the
+   * `exists()` and `set()` calls, another client could write to the same key.
+   * For critical use cases requiring true atomic set-if-not-exists semantics,
+   * use Redis `SET key value NX` or PostgreSQL `INSERT ... ON CONFLICT DO NOTHING`
+   * directly via the storage layer.
+   * 
+   * @template T - The type of the value being stored
+   * @param key - Unique identifier for the stored value
+   * @param value - The value to store if key doesn't exist
+   * @param options - Optional storage configuration
+   * @returns Promise resolving to true if value was set, false if key already existed
+   * 
+   * @example
+   * ```typescript
+   * // Initialize a counter only if it doesn't exist
+   * await client.setIfNotExists('counter', 0);
+   * ```
    */
   async setIfNotExists<T = unknown>(key: string, value: T, options?: StorageOptions): Promise<boolean> {
     const exists = await this.storage.exists(key, options);
