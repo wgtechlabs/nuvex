@@ -68,7 +68,6 @@
  * - **Microservices**: Shared data layer across distributed services
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  * @see {@link https://github.com/wgtechlabs/nuvex} GitHub Repository
  * @see {@link https://wgtechlabs.com} WG Technology Labs
