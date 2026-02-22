@@ -1,3 +1,6 @@
+![GitHub Repo Banner](https://ghrb.waren.build/banner?header=Nuvex+%F0%9F%97%84%EF%B8%8F%F0%9F%92%8E&subheader=TypeScript-first+3-layer+storage+SDK+for+Node.js.&bg=016EEA-016EEA&color=FFFFFF&headerfont=Google+Sans+Code&subheaderfont=Sour+Gummy&watermarkpos=bottom-right)
+<!-- Created with GitHub Repo Banner by Waren Gonzaga: https://ghrb.waren.build -->
+
 # Nuvex 🗄️💎 [![made by](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs)
 
 [![github actions workflow status](https://img.shields.io/github/actions/workflow/status/wgtechlabs/nuvex/package.yml?branch=main&style=flat-square&logo=github&labelColor=181717)](https://github.com/wgtechlabs/nuvex/actions/workflows/package.yml) [![codecov](https://img.shields.io/codecov/c/github/wgtechlabs/nuvex?token=PWRJTBVKQ9&style=flat-square&logo=codecov&labelColor=181717)](https://codecov.io/gh/wgtechlabs/nuvex) [![npm downloads](https://img.shields.io/npm/d18m/nuvex?style=flat-square&logo=npm&label=installs&labelColor=181717&color=%23CD0000)](https://www.npmjs.com/package/nuvex) [![bun](https://img.shields.io/badge/bun-%3E%3D1.0-F9F1E1.svg?logo=bun&logoColor=black&labelColor=181717&style=flat-square)](https://bun.sh) [![node](https://img.shields.io/badge/node-%3E%3D20-339933.svg?logo=node.js&logoColor=white&labelColor=181717&style=flat-square)](https://nodejs.org) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![release](https://img.shields.io/github/release/wgtechlabs/nuvex.svg?logo=github&labelColor=181717&color=green&style=flat-square)](https://github.com/wgtechlabs/nuvex/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/nuvex/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/nuvex/blob/main/LICENSE)
@@ -34,13 +37,7 @@ Every developer has been there: your app is slow because you're hitting the data
 | <div align="center"><a href="https://unthread.com" target="_blank"><b>Unthread</b></a><br/>Streamlined support ticketing for modern teams.</div> |
 <!-- markdownlint-enable MD033 -->
 
-## 💸 Sponsored Ads
-
-Open source development is resource-intensive. These **sponsored ads help keep Log Engine free and actively maintained** while connecting you with tools and services that support open-source development.
-
-[![sponsored ads](https://gitads.dev/v1/ad-serve?source=wgtechlabs/nuvex@github)](https://gitads.dev/v1/ad-track?source=wgtechlabs/nuvex@github)
-
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 # Bun (recommended)
