@@ -5,12 +5,22 @@
  * Database schema setup and migration utilities for PostgreSQL storage layer.
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 
 import type { Pool as PoolType } from 'pg';
 import type { PostgresSchemaConfig } from '../types/index.js';
+import type { Logger } from '../interfaces/index.js';
+
+/** Create a default console-based logger */
+function createDefaultLogger(): Logger {
+  return {
+    debug: () => {},
+    info: (message: string, meta?: unknown) => console.log(message, ...(meta !== undefined ? [meta] : [])),
+    warn: (message: string, meta?: unknown) => console.warn(message, ...(meta !== undefined ? [meta] : [])),
+    error: (message: string, meta?: unknown) => console.error(message, ...(meta !== undefined ? [meta] : [])),
+  };
+}
 
 /**
  * Validate SQL identifier to prevent SQL injection
@@ -161,8 +171,10 @@ export interface SchemaSetupOptions {
  */
 export async function setupNuvexSchema(
   db: PoolType, 
-  options: SchemaSetupOptions = {}
+  options: SchemaSetupOptions = {},
+  logger?: Logger
 ): Promise<void> {
+  const log = logger ?? createDefaultLogger();
   try {
     // Enable pg_trgm extension if requested (for pattern matching)
     if (options.enableTrigram) {
@@ -177,12 +189,12 @@ export async function setupNuvexSchema(
     
     // Setup periodic cleanup job if requested
     if (options.enableCleanupJob) {
-      await setupCleanupJob(db, undefined, options.schema);
+      await setupCleanupJob(db, undefined, options.schema, logger);
     }
     
-    console.log('Nuvex database schema setup completed successfully');
+    log.info('Nuvex database schema setup completed successfully');
   } catch (error) {
-    console.error('Failed to setup Nuvex database schema:', error);
+    log.error('Failed to setup Nuvex database schema:', error);
     throw error;
   }
 }
@@ -211,7 +223,8 @@ export async function setupNuvexSchema(
  * @requires pg_cron extension and superuser privileges
  * @since 1.0.0
  */
-async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: PostgresSchemaConfig): Promise<void> {
+async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: PostgresSchemaConfig, logger?: Logger): Promise<void> {
+  const log = logger ?? createDefaultLogger();
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
     validateSQLIdentifier(tableName, 'table name');
@@ -226,9 +239,9 @@ async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: Postgre
         'SELECT cleanup_expired_${tableName}();'
       );
     `, [jobName]);
-    console.log(`Nuvex cleanup cron job scheduled as '${jobName}'`);
+    log.info(`Nuvex cleanup cron job scheduled as '${jobName}'`);
   } catch (error) {
-    console.error('Failed to schedule Nuvex cleanup cron job:', error);
+    log.error('Failed to schedule Nuvex cleanup cron job:', error);
     throw error;
   }
 }
@@ -252,7 +265,8 @@ async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: Postgre
  * 
  * @since 1.0.0
  */
-export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchemaConfig): Promise<number> {
+export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchemaConfig, logger?: Logger): Promise<number> {
+  const log = logger ?? createDefaultLogger();
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
     validateSQLIdentifier(tableName, 'table name');
@@ -260,7 +274,7 @@ export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchem
     const result = await db.query(`SELECT cleanup_expired_${tableName}() as deleted_count;`);
     return result.rows[0]?.deleted_count || 0;
   } catch (error) {
-    console.error('Failed to cleanup expired entries:', error);
+    log.error('Failed to cleanup expired entries:', error);
     throw error;
   }
 }
@@ -286,7 +300,8 @@ export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchem
  * @warning This operation is irreversible and will cause permanent data loss
  * @since 1.0.0
  */
-export async function dropNuvexSchema(db: PoolType, schema?: PostgresSchemaConfig): Promise<void> {
+export async function dropNuvexSchema(db: PoolType, schema?: PostgresSchemaConfig, logger?: Logger): Promise<void> {
+  const log = logger ?? createDefaultLogger();
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
     validateSQLIdentifier(tableName, 'table name');
@@ -297,9 +312,9 @@ export async function dropNuvexSchema(db: PoolType, schema?: PostgresSchemaConfi
       DROP FUNCTION IF EXISTS cleanup_expired_${tableName}();
       DROP TABLE IF EXISTS ${tableName} CASCADE;
     `);
-    console.log('Nuvex database schema dropped successfully');
+    log.info('Nuvex database schema dropped successfully');
   } catch (error) {
-    console.error('Failed to drop Nuvex database schema:', error);
+    log.error('Failed to drop Nuvex database schema:', error);
     throw error;
   }
 }
