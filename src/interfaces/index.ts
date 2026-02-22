@@ -5,7 +5,6 @@
  * Core interfaces for the multi-layer storage SDK
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 
@@ -175,16 +174,6 @@ export interface Store extends Storage {
   restore(source: string): Promise<boolean>;
 }
 
-// ===== Database Connection Interface =====
-
-export interface DatabaseConnection {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  isConnected(): boolean;
-  query(sql: string, params?: any[]): Promise<any>;
-  transaction<T>(callback: (client: any) => Promise<T>): Promise<T>;
-}
-
 // ===== Storage Layer Interface =====
 
 /**
@@ -241,6 +230,13 @@ export interface StorageLayerInterface {
   clear?(): Promise<void>;
   
   /**
+   * Get all keys matching an optional pattern from this storage layer
+   * @param pattern - Optional glob pattern for key matching (e.g., 'user:*')
+   * @returns Promise resolving to an array of matching keys
+   */
+  keys?(pattern?: string): Promise<string[]>;
+  
+  /**
    * Health check for this storage layer
    * @returns Promise resolving to true if the layer is healthy and operational
    */
@@ -260,13 +256,3 @@ export interface StorageLayerInterface {
   increment?(key: string, delta: number, ttlSeconds?: number): Promise<number>;
 }
 
-// ===== Cache Interface =====
-
-export interface CacheLayer {
-  get<T = any>(key: string): Promise<T | null>;
-  set<T = any>(key: string, value: T, ttl?: number): Promise<boolean>;
-  delete(key: string): Promise<boolean>;
-  exists(key: string): Promise<boolean>;
-  clear(): Promise<number>;
-  keys(pattern?: string): Promise<string[]>;  ttl(key: string): Promise<number>;
-}
