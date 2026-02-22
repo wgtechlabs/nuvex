@@ -20,7 +20,6 @@
  * - Pluggable logging support
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 import type { 
@@ -34,14 +33,8 @@ import type {
   QueryResult
 } from '../types/index.js';
 import { StorageLayer } from '../types/index.js';
-import type { Storage, Logger } from '../interfaces/index.js';
+import type { Storage, Logger, StorageLayerInterface } from '../interfaces/index.js';
 import { MemoryStorage, RedisStorage, PostgresStorage } from '../layers/index.js';
-
-// Node.js global types
-declare global {
-  function setInterval(callback: () => void, ms: number): number;
-  function clearInterval(id: number): void;
-}
 
 /**
  * # StorageEngine - Multi-layer Storage Architecture
@@ -173,7 +166,7 @@ export class StorageEngine implements Storage {
   // Configuration and state
   private config: NuvexConfig;
   private connected: boolean;
-  private cleanupInterval: number | null;
+  private cleanupInterval: ReturnType<typeof setInterval> | null;
   private logger: Logger | null;
   private metrics: StorageMetrics;
 
@@ -781,73 +774,57 @@ export class StorageEngine implements Storage {
   
   // Batch operations
   async setBatch(operations: BatchOperation[]): Promise<BatchResult[]> {
-    const results: BatchResult[] = [];
-    
-    for (const op of operations) {
-      try {
+    const settled = await Promise.allSettled(
+      operations.map(async (op): Promise<BatchResult> => {
         if (op.operation === 'set' && op.value !== undefined) {
           const success = await this.set(op.key, op.value, op.options);
-          results.push({ key: op.key, success });
-        } else {
-          results.push({ key: op.key, success: false, error: 'Invalid operation' });
+          return { key: op.key, success };
         }
-      } catch (error) {
-        results.push({ 
-          key: op.key, 
-          success: false, 
-          error: (error as Error).message 
-        });
-      }
-    }
+        return { key: op.key, success: false, error: 'Invalid operation' };
+      })
+    );
     
-    return results;
+    return settled.map((result, index) =>
+      result.status === 'fulfilled'
+        ? result.value
+        : { key: operations[index].key, success: false, error: (result.reason as Error).message }
+    );
   }
   
   async getBatch(keys: string[], options: StorageOptions = {}): Promise<BatchResult[]> {
-    const results: BatchResult[] = [];
-    
-    for (const key of keys) {
-      try {
+    const settled = await Promise.allSettled(
+      keys.map(async (key): Promise<BatchResult> => {
         const value = await this.get(key, options);
-        if (value !== null) {
-          results.push({ key, success: true, value });
-        } else {
-          results.push({ key, success: false, value: null });
-        }
-      } catch (error) {
-        results.push({ 
-          key, 
-          success: false, 
-          error: (error as Error).message 
-        });
-      }
-    }
+        return value !== null
+          ? { key, success: true, value }
+          : { key, success: false, value: null };
+      })
+    );
     
-    return results;
+    return settled.map((result, index) =>
+      result.status === 'fulfilled'
+        ? result.value
+        : { key: keys[index], success: false, error: (result.reason as Error).message }
+    );
   }
   
   async deleteBatch(keys: string[]): Promise<BatchResult[]> {
-    const results: BatchResult[] = [];
-    
-    for (const key of keys) {
-      try {
+    const settled = await Promise.allSettled(
+      keys.map(async (key): Promise<BatchResult> => {
         const existed = await this.exists(key);
         if (existed) {
           const success = await this.delete(key);
-          results.push({ key, success });
-        } else {
-          results.push({ key, success: false });
+          return { key, success };
         }
-      } catch (error) {
-        results.push({ 
-          key, 
-          success: false, 
-          error: (error as Error).message 
-        });
-      }
-    }
+        return { key, success: false };
+      })
+    );
     
-    return results;
+    return settled.map((result, index) =>
+      result.status === 'fulfilled'
+        ? result.value
+        : { key: keys[index], success: false, error: (result.reason as Error).message }
+    );
   }
   
   // Query operations
@@ -882,31 +859,63 @@ export class StorageEngine implements Storage {
   }
   
   /**
-   * Get all keys matching a pattern
+   * Get all keys matching a pattern across all storage layers
    * 
-   * **IMPORTANT**: This method is currently not fully functional with the modular layer architecture.
-   * Pattern-based key listing requires each layer to expose a keys() method, which is not yet
-   * implemented in the StorageLayerInterface.
+   * Collects keys from all available layers (Memory, Redis, PostgreSQL) and
+   * returns deduplicated results. Currently implemented for the Memory layer;
+   * Redis and PostgreSQL layer support will be added in future versions.
    * 
-   * **Current Behavior**: Returns empty array
+   * @param pattern - Glob pattern for key matching (default: '*' returns all keys)
+   * @returns Promise resolving to array of unique matching keys
    * 
-   * **Future Implementation**: Will require adding keys() method to StorageLayerInterface and
-   * implementing it in each layer class (MemoryStorage, RedisStorage, PostgresStorage).
-   * 
-   * @param _pattern - Glob pattern for key matching (currently not used)
-   * @returns Promise resolving to array of matching keys (currently always empty)
-   * 
-   * @deprecated This method needs reimplementation for the modular architecture
-   * @see https://github.com/wgtechlabs/nuvex/issues/XXX for tracking
+   * @since 1.0.0
    */
-  async keys(_pattern = '*'): Promise<string[]> {
+  async keys(pattern = '*'): Promise<string[]> {
     const allKeys = new Set<string>();
     
-    // TODO: Implement keys() method in StorageLayerInterface and each layer class
-    // This would allow proper pattern-based key listing across all layers
-    // For now, return empty array to maintain API compatibility
+    // Collect keys from Memory (L1) - always available
+    if (this.l1Memory.keys) {
+      try {
+        const memoryKeys = await this.l1Memory.keys(pattern);
+        for (const key of memoryKeys) {
+          allKeys.add(key);
+        }
+      } catch (error) {
+        this.log('warn', 'Error collecting keys from Memory L1', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
     
-    this.log('warn', 'keys() method not fully implemented with modular layers - returning empty array');
+    // Collect keys from Redis (L2) - if keys() is implemented
+    const l2Layer = this.l2Redis as StorageLayerInterface | null;
+    if (l2Layer?.keys) {
+      try {
+        const redisKeys = await l2Layer.keys(pattern);
+        for (const key of redisKeys) {
+          allKeys.add(key);
+        }
+      } catch (error) {
+        this.log('warn', 'Error collecting keys from Redis L2', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    
+    // Collect keys from PostgreSQL (L3) - if keys() is implemented
+    const l3Layer = this.l3Postgres as StorageLayerInterface | null;
+    if (l3Layer?.keys) {
+      try {
+        const pgKeys = await l3Layer.keys(pattern);
+        for (const key of pgKeys) {
+          allKeys.add(key);
+        }
+      } catch (error) {
+        this.log('warn', 'Error collecting keys from PostgreSQL L3', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
     
     return Array.from(allKeys);
   }
@@ -1272,12 +1281,6 @@ export class StorageEngine implements Storage {
     }
     
     return totalHits + totalMisses > 0 ? totalHits / (totalHits + totalMisses) : 0;
-  }
-  
-  private matchPattern(key: string, pattern: string): boolean {
-    // Simple glob pattern matching
-    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'));
-    return regex.test(key);
   }
   
   private applySorting<T>(items: Array<{ key: string; value: T; metadata: StorageItem<T> }>, options: QueryOptions) {
