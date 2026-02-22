@@ -3,19 +3,9 @@
  * Tests for the main client class functionality
  */
 
+import { describe, test, it, expect, beforeEach, afterEach, beforeAll, afterAll, mock, spyOn } from 'bun:test';
 import { NuvexClient } from '../../core/client.js';
 import { mockNuvexConfig } from '../fixtures/data.js';
-import { MockRedisClient } from '../mocks/redis.mock.js';
-import { MockPgPool } from '../mocks/postgres.mock.js';
-
-// Mock the external dependencies
-jest.mock('redis', () => ({
-  createClient: jest.fn(() => new MockRedisClient())
-}));
-
-jest.mock('pg', () => ({
-  Pool: jest.fn(() => new MockPgPool())
-}));
 
 describe('NuvexClient', () => {
   let client: NuvexClient;
@@ -405,7 +395,7 @@ describe('NuvexClient', () => {
 
     test('should handle cleanup errors', async () => {
       // Mock storage to throw error
-      jest.spyOn(client.getEngine(), 'cleanupExpiredMemory').mockImplementation(() => {
+      spyOn(client.getEngine(), 'cleanupExpiredMemory').mockImplementation(() => {
         throw new Error('Cleanup failed');
       });
 
@@ -415,7 +405,7 @@ describe('NuvexClient', () => {
 
     test('should handle compact errors', async () => {
       // Mock cleanup to throw error
-      jest.spyOn(client, 'cleanup').mockRejectedValue(new Error('Cleanup failed'));
+      spyOn(client, 'cleanup').mockRejectedValue(new Error('Cleanup failed'));
 
       await expect(client.compact()).rejects.toThrow('Cleanup failed');
     });
@@ -452,7 +442,7 @@ describe('NuvexClient', () => {
 
     test('should handle backup errors', async () => {
       // Mock storage.keys to throw error
-      jest.spyOn(client.getEngine(), 'keys').mockRejectedValue(new Error('Keys failed'));
+      spyOn(client.getEngine(), 'keys').mockRejectedValue(new Error('Keys failed'));
 
       await expect(client.backup()).rejects.toThrow('Keys failed');
     });
@@ -657,10 +647,10 @@ describe('NuvexClient', () => {
 
   describe('Configuration with Logging', () => {    test('should handle logging configuration', async () => {
       const mockLogger = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn()
+        debug: mock(),
+        info: mock(),
+        warn: mock(),
+        error: mock()
       };
 
       const clientWithLogging = new NuvexClient({
@@ -678,10 +668,10 @@ describe('NuvexClient', () => {
       expect(mockLogger.info).toHaveBeenCalled();
     });    test('should update logging configuration', async () => {
       const newLogger = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn()
+        debug: mock(),
+        info: mock(),
+        warn: mock(),
+        error: mock()
       };
 
       await client.configure({

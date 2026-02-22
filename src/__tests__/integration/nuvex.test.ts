@@ -8,20 +8,10 @@
  * @fileoverview Integration tests with zero hardcoded credentials
  */
 
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { NuvexClient } from '../../core/client.js';
 import { StorageLayer } from '../../types/index.js';
-import { MockRedisClient } from '../mocks/redis.mock.js';
-import { MockPgPool } from '../mocks/postgres.mock.js';
 import { getTestConfig } from '../fixtures/config.js';
-
-// Mock the external dependencies
-jest.mock('redis', () => ({
-  createClient: jest.fn(() => new MockRedisClient())
-}));
-
-jest.mock('pg', () => ({
-  Pool: jest.fn(() => new MockPgPool())
-}));
 
 describe('Nuvex SDK Integration Tests', () => {
   let client: NuvexClient;
