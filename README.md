@@ -37,13 +37,7 @@ Every developer has been there: your app is slow because you're hitting the data
 | <div align="center"><a href="https://unthread.com" target="_blank"><b>Unthread</b></a><br/>Streamlined support ticketing for modern teams.</div> |
 <!-- markdownlint-enable MD033 -->
 
-## 💸 Sponsored Ads
-
-Open source development is resource-intensive. These **sponsored ads help keep Log Engine free and actively maintained** while connecting you with tools and services that support open-source development.
-
-[![sponsored ads](https://gitads.dev/v1/ad-serve?source=wgtechlabs/nuvex@github)](https://gitads.dev/v1/ad-track?source=wgtechlabs/nuvex@github)
-
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 pnpm add nuvex pg redis
