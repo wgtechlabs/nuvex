@@ -4,8 +4,8 @@ Thank you for your interest in contributing to Nuvex! This guide covers everythi
 
 ## Prerequisites
 
-- **Node.js** `>=20.0.0`
-- **pnpm** `>=9.0.0`
+- **Bun** `>=1.0.0` (primary runtime and package manager)
+- **Node.js** `>=20.0.0` (for Node.js consumers)
 - **Redis** and **PostgreSQL** for integration testing
 
 ## Development Setup
@@ -16,16 +16,16 @@ git clone https://github.com/wgtechlabs/nuvex.git
 cd nuvex
 
 # Install dependencies
-pnpm install
+bun install
 
 # Build the project
-pnpm build
+bun run build
 
 # Run tests
-pnpm test
+bun test
 
 # Run linter
-pnpm lint
+bun run lint
 ```
 
 ## Commit Convention
@@ -68,7 +68,7 @@ This project enforces the **[Clean Commit](https://github.com/wgtechlabs/clean-c
 🗑️ remove(deps): unused lodash dependency
 🔒 security: patch prototype pollution vulnerability
 ⚙️ setup: add github actions workflow
-☕ chore: update pnpm dependencies
+☕ chore: update bun dependencies
 🧪 test: add unit tests for healthCheck method
 📖 docs: update quick start installation guide
 🚀 release: version 1.1.0
@@ -78,8 +78,8 @@ This project enforces the **[Clean Commit](https://github.com/wgtechlabs/clean-c
 
 1. Fork the repository and create a branch from `main`
 2. Make your changes following the code standards below
-3. Ensure all tests pass: `pnpm test`
-4. Ensure linting passes: `pnpm lint`
+3. Ensure all tests pass: `bun test`
+4. Ensure linting passes: `bun run lint`
 5. Write or update tests for any new or changed behavior
 6. Submit a pull request with a clear description of the changes
 
@@ -95,26 +95,26 @@ This project enforces the **[Clean Commit](https://github.com/wgtechlabs/clean-c
 
 ```bash
 # Run linter
-pnpm lint
+bun run lint
 
 # Auto-fix lint issues
-pnpm lint:fix
+bun run lint:fix
 
 # Run security linter
-pnpm lint:security
+bun run lint:security
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-pnpm test
+bun test
 
 # Run tests in watch mode
-pnpm test:watch
+bun test --watch
 
 # Run tests with coverage
-pnpm test:coverage
+bun test --coverage
 ```
 
 All new features must include corresponding tests. Bug fixes should include a regression test.
@@ -124,7 +124,7 @@ All new features must include corresponding tests. Bug fixes should include a re
 Before submitting a PR, run the full validation suite:
 
 ```bash
-pnpm validate
+bun run validate
 ```
 
 This runs the linter, tests, and build in sequence.
@@ -133,7 +133,7 @@ This runs the linter, tests, and build in sequence.
 
 Please use [GitHub Issues](https://github.com/wgtechlabs/nuvex/issues) to report bugs or request features. Include as much detail as possible:
 
-- Node.js and pnpm versions
+- Bun and Node.js versions
 - Reproduction steps
 - Expected vs actual behavior
 

@@ -3,6 +3,8 @@
  * Tests for custom table and column name configuration
  */
 
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import type { Mock } from 'bun:test';
 import type { Pool as PoolType } from 'pg';
 import { PostgresStorage } from '../../layers/postgres';
 import { generateNuvexSchemaSQL } from '../../core/database';
@@ -232,28 +234,28 @@ describe('PostgreSQL Configurable Schema', () => {
 
   describe('PostgresStorage with custom schema', () => {
     // Mock the pg.Pool constructor
-    let _poolMock: jest.Mock;
+    let _poolMock: Mock<any>;
     
     beforeEach(() => {
       // Create a mock Pool constructor
-      _poolMock = jest.fn().mockImplementation(() => ({
-        query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-        connect: jest.fn().mockResolvedValue({
-          query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-          release: jest.fn()
+      _poolMock = mock().mockImplementation(() => ({
+        query: mock().mockResolvedValue({ rows: [], rowCount: 0 }),
+        connect: mock().mockResolvedValue({
+          query: mock().mockResolvedValue({ rows: [], rowCount: 0 }),
+          release: mock()
         }),
-        end: jest.fn()
+        end: mock()
       }));
     });
 
     it('should use default table and column names', async () => {
       const mockPool = {
-        query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-        connect: jest.fn().mockResolvedValue({
-          query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-          release: jest.fn()
+        query: mock().mockResolvedValue({ rows: [], rowCount: 0 }),
+        connect: mock().mockResolvedValue({
+          query: mock().mockResolvedValue({ rows: [], rowCount: 0 }),
+          release: mock()
         }),
-        end: jest.fn()
+        end: mock()
       };
       
       const storage = new PostgresStorage(mockPool as unknown as PoolType);

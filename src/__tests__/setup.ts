@@ -1,8 +1,9 @@
 /**
- * Jest Test Setup
+ * Bun Test Setup
  * Global test configuration and utilities with zero hardcoded credentials
  */
 
+import { beforeAll, afterAll, setDefaultTimeout, expect } from 'bun:test';
 import { initializeTestEnvironment, validateTestEnvironment, cleanupTestEnvironment } from './fixtures/config.js';
 
 // Initialize secure test environment
@@ -15,7 +16,7 @@ if (!validation.isValid) {
 }
 
 // Increase timeout for integration tests
-jest.setTimeout(30000);
+setDefaultTimeout(30000);
 
 // Mock console methods during tests (optional)
 const originalError = console.error;
@@ -24,29 +25,27 @@ const originalWarn = console.warn;
 beforeAll(() => {
   // Optionally suppress console output during tests
   // Uncomment the lines below if you want to suppress console output
-  // console.error = jest.fn();
-  // console.warn = jest.fn();
+  // console.error = () => {};
+  // console.warn = () => {};
 });
 
 afterAll(() => {
   // Restore console methods
   console.error = originalError;
   console.warn = originalWarn;
-  
+
   // Cleanup test environment
   cleanupTestEnvironment();
 });
 
-// Global test utilities
-declare global {
-  namespace jest {
-    interface Matchers<R> {
-      toBeWithinRange(floor: number, ceiling: number): R;
-    }
+// Type augmentation for custom Bun Test matchers
+declare module 'bun:test' {
+  interface Matchers<R> {
+    toBeWithinRange(floor: number, ceiling: number): R;
   }
 }
 
-// Custom Jest matchers
+// Custom Bun Test matchers
 expect.extend({
   toBeWithinRange(received: number, floor: number, ceiling: number) {
     const pass = received >= floor && received <= ceiling;

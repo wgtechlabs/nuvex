@@ -3,6 +3,7 @@
  * Tests for database schema setup and cleanup functions
  */
 
+import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from 'bun:test';
 import {
   setupNuvexSchema,
   cleanupExpiredEntries,
@@ -18,13 +19,13 @@ describe('Database Utilities', () => {
   beforeEach(() => {
     mockDb = createMockPgPool();
     // Mock console methods to avoid test output noise
-    jest.spyOn(console, 'log').mockImplementation();
-    jest.spyOn(console, 'error').mockImplementation();
-    jest.spyOn(console, 'warn').mockImplementation();
+    spyOn(console, 'log').mockImplementation(() => {});
+    spyOn(console, 'error').mockImplementation(() => {});
+    spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    mock.restore();
   });
   describe('NUVEX_SCHEMA_SQL', () => {
     it('should contain the complete schema definition', () => {
@@ -41,7 +42,7 @@ describe('Database Utilities', () => {
 
   describe('setupNuvexSchema', () => {
     it('should execute schema setup with default options', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
 
       await setupNuvexSchema(mockDb);
 
@@ -50,7 +51,7 @@ describe('Database Utilities', () => {
     });
 
     it('should enable trigram extension when requested', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
       const options: SchemaSetupOptions = { enableTrigram: true };
 
       await setupNuvexSchema(mockDb, options);
@@ -58,7 +59,7 @@ describe('Database Utilities', () => {
       expect(querySpy).toHaveBeenCalledWith('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
       expect(querySpy).toHaveBeenCalledWith(NUVEX_SCHEMA_SQL);
     });    it('should setup cleanup job when requested', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
       // Make the cron job query fail to trigger the error
       querySpy.mockImplementation((...args: unknown[]) => {
         const sql = args[0] as string;
@@ -83,14 +84,14 @@ describe('Database Utilities', () => {
 
     it('should handle schema setup errors', async () => {
       const error = new Error('Database connection failed');
-      jest.spyOn(mockDb, 'query').mockRejectedValue(error);
+      spyOn(mockDb, 'query').mockRejectedValue(error);
 
       await expect(setupNuvexSchema(mockDb)).rejects.toThrow('Database connection failed');
       expect(console.error).toHaveBeenCalledWith('Failed to setup Nuvex database schema:', error);
     });
 
     it('should handle both options together', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
       const options: SchemaSetupOptions = { 
         enableTrigram: true, 
         enableCleanupJob: true 
@@ -105,7 +106,7 @@ describe('Database Utilities', () => {
     });
 
     it('should setup schema with custom table name', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
       const options: SchemaSetupOptions = {
         schema: {
           tableName: 'storage_cache'
@@ -124,7 +125,7 @@ describe('Database Utilities', () => {
     });
 
     it('should setup schema with custom column names', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
       const options: SchemaSetupOptions = {
         schema: {
           columns: {
@@ -147,7 +148,7 @@ describe('Database Utilities', () => {
     });
 
     it('should setup schema with custom table and column names for Telegram bot', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
       const options: SchemaSetupOptions = {
         schema: {
           tableName: 'storage_cache',
@@ -175,7 +176,7 @@ describe('Database Utilities', () => {
   describe('cleanupExpiredEntries', () => {
     it('should return number of deleted entries', async () => {
       const mockResult = { rows: [{ deleted_count: 5 }] };
-      jest.spyOn(mockDb, 'query').mockResolvedValue(mockResult);
+      spyOn(mockDb, 'query').mockResolvedValue(mockResult);
 
       const deletedCount = await cleanupExpiredEntries(mockDb);
 
@@ -185,7 +186,7 @@ describe('Database Utilities', () => {
 
     it('should return 0 when no deleted_count in result', async () => {
       const mockResult = { rows: [{}] };
-      jest.spyOn(mockDb, 'query').mockResolvedValue(mockResult);
+      spyOn(mockDb, 'query').mockResolvedValue(mockResult);
 
       const deletedCount = await cleanupExpiredEntries(mockDb);
 
@@ -194,7 +195,7 @@ describe('Database Utilities', () => {
 
     it('should return 0 when no rows in result', async () => {
       const mockResult = { rows: [] };
-      jest.spyOn(mockDb, 'query').mockResolvedValue(mockResult);
+      spyOn(mockDb, 'query').mockResolvedValue(mockResult);
 
       const deletedCount = await cleanupExpiredEntries(mockDb);
 
@@ -203,7 +204,7 @@ describe('Database Utilities', () => {
 
     it('should handle cleanup errors', async () => {
       const error = new Error('Cleanup failed');
-      jest.spyOn(mockDb, 'query').mockRejectedValue(error);
+      spyOn(mockDb, 'query').mockRejectedValue(error);
 
       await expect(cleanupExpiredEntries(mockDb)).rejects.toThrow('Cleanup failed');
       expect(console.error).toHaveBeenCalledWith('Failed to cleanup expired entries:', error);
@@ -211,7 +212,7 @@ describe('Database Utilities', () => {
 
     it('should use custom table name when provided', async () => {
       const mockResult = { rows: [{ deleted_count: 3 }] };
-      jest.spyOn(mockDb, 'query').mockResolvedValue(mockResult);
+      spyOn(mockDb, 'query').mockResolvedValue(mockResult);
 
       const deletedCount = await cleanupExpiredEntries(mockDb, {
         tableName: 'storage_cache'
@@ -230,7 +231,7 @@ describe('Database Utilities', () => {
 
   describe('dropNuvexSchema', () => {
     it('should drop all schema components', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
 
       await dropNuvexSchema(mockDb);
 
@@ -242,14 +243,14 @@ describe('Database Utilities', () => {
 
     it('should handle drop schema errors', async () => {
       const error = new Error('Drop schema failed');
-      jest.spyOn(mockDb, 'query').mockRejectedValue(error);
+      spyOn(mockDb, 'query').mockRejectedValue(error);
 
       await expect(dropNuvexSchema(mockDb)).rejects.toThrow('Drop schema failed');
       expect(console.error).toHaveBeenCalledWith('Failed to drop Nuvex database schema:', error);
     });
 
     it('should drop custom table schema', async () => {
-      const querySpy = jest.spyOn(mockDb, 'query');
+      const querySpy = spyOn(mockDb, 'query');
 
       await dropNuvexSchema(mockDb, {
         tableName: 'storage_cache'

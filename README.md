@@ -3,9 +3,9 @@
 
 # Nuvex 🗄️💎 [![made by](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs)
 
-[![github actions workflow status](https://img.shields.io/github/actions/workflow/status/wgtechlabs/nuvex/test.yml?branch=main&style=flat-square&logo=github&labelColor=181717)](https://github.com/wgtechlabs/nuvex/actions/workflows/test.yml) [![codecov](https://img.shields.io/codecov/c/github/wgtechlabs/nuvex?token=PWRJTBVKQ9&style=flat-square&logo=codecov&labelColor=181717)](https://codecov.io/gh/wgtechlabs/nuvex) [![npm downloads](https://img.shields.io/npm/d18m/nuvex?style=flat-square&logo=npm&label=installs&labelColor=181717&color=%23CD0000)](https://www.npmjs.com/package/nuvex) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![release](https://img.shields.io/github/release/wgtechlabs/nuvex.svg?logo=github&labelColor=181717&color=green&style=flat-square)](https://github.com/wgtechlabs/nuvex/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/nuvex/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/nuvex/blob/main/LICENSE)
+[![github actions workflow status](https://img.shields.io/github/actions/workflow/status/wgtechlabs/nuvex/package.yml?branch=main&style=flat-square&logo=github&labelColor=181717)](https://github.com/wgtechlabs/nuvex/actions/workflows/package.yml) [![codecov](https://img.shields.io/codecov/c/github/wgtechlabs/nuvex?token=PWRJTBVKQ9&style=flat-square&logo=codecov&labelColor=181717)](https://codecov.io/gh/wgtechlabs/nuvex) [![npm downloads](https://img.shields.io/npm/d18m/%40wgtechlabs%2Fnuvex?style=flat-square&logo=npm&label=installs&labelColor=181717&color=%23CD0000)](https://www.npmjs.com/package/@wgtechlabs/nuvex) [![bun](https://img.shields.io/badge/bun-%3E%3D1.0-F9F1E1.svg?logo=bun&logoColor=black&labelColor=181717&style=flat-square)](https://bun.sh) [![node](https://img.shields.io/badge/node-%3E%3D20-339933.svg?logo=node.js&logoColor=white&labelColor=181717&style=flat-square)](https://nodejs.org) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![release](https://img.shields.io/github/release/wgtechlabs/nuvex.svg?logo=github&labelColor=181717&color=green&style=flat-square)](https://github.com/wgtechlabs/nuvex/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/nuvex/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/nuvex.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/nuvex/blob/main/LICENSE)
 
-**Nuvex** is the ultimate production-ready, TypeScript-first 3-layer storage SDK for Node.js applications. Combining the speed of memory cache, the reliability of Redis, and the persistence of PostgreSQL — all with one simple API and zero configuration hassle. Born from real-world development challenges and proven in production environments, Nuvex delivers enterprise-grade storage with intelligent caching that actually works.
+**Nuvex** is the ultimate production-ready, TypeScript-first 3-layer storage SDK for Bun and Node.js applications. Combining the speed of memory cache, the reliability of Redis, and the persistence of PostgreSQL — all with one simple API and zero configuration hassle. Born from real-world development challenges and proven in production environments, Nuvex delivers enterprise-grade storage with intelligent caching that actually works.
 
 The first storage SDK with built-in automatic data promotion/demotion, comprehensive health monitoring, and backup/restore capabilities. Stop wrestling with complex storage configurations and start building amazing applications with confidence. Whether you're creating high-performance APIs, developing microservices, or deploying production servers, Nuvex provides intelligent multi-layer storage that scales with your application's growth — from your first prototype to handling millions of requests across distributed systems.
 
@@ -40,11 +40,15 @@ Every developer has been there: your app is slow because you're hitting the data
 ##  Quick Start
 
 ```bash
-pnpm add nuvex pg redis
+# Bun (recommended)
+bun add @wgtechlabs/nuvex pg redis
+
+# npm / Node.js
+npm install @wgtechlabs/nuvex pg redis
 ```
 
 ```typescript
-import { NuvexClient } from 'nuvex';
+import { NuvexClient } from '@wgtechlabs/nuvex';
 
 // Initialize once, use everywhere
 const storage = await NuvexClient.initialize({
@@ -81,10 +85,14 @@ console.log('Storage healthy:', health.overall);
 ## 📦 Installation
 
 ```bash
-pnpm add nuvex pg redis
+# Bun (recommended)
+bun add @wgtechlabs/nuvex pg redis
+
+# npm / Node.js
+npm install @wgtechlabs/nuvex pg redis
 ```
 
-## 🎯 Perfect For Any Node.js Application
+## 🎯 Perfect For Any JavaScript Application
 
 - **🌐 Web APIs**: Session management, response caching, rate limiting
 - **🛒 E-commerce**: Product catalogs, shopping carts, user preferences  
@@ -259,7 +267,7 @@ Nuvex supports pluggable logging with any logger that implements the simple inte
 
 ```typescript
 import { LogEngine } from '@wgtechlabs/log-engine';
-import { Nuvex } from 'nuvex';
+import { Nuvex } from '@wgtechlabs/nuvex';
 
 // One-time configuration
 LogEngine.configure({

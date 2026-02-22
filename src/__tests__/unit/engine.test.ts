@@ -8,21 +8,11 @@
  * @fileoverview Engine unit tests with zero hardcoded credentials
  */
 
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { StorageEngine } from '../../core/engine.js';
 import { StorageLayer } from '../../types/index.js';
 import { mockNuvexConfig } from '../fixtures/data.js';
 import { getTestPostgresConfig } from '../fixtures/config.js';
-import { MockRedisClient } from '../mocks/redis.mock.js';
-import { MockPgPool } from '../mocks/postgres.mock.js';
-
-// Mock the external dependencies
-jest.mock('redis', () => ({
-  createClient: jest.fn(() => new MockRedisClient())
-}));
-
-jest.mock('pg', () => ({
-  Pool: jest.fn(() => new MockPgPool())
-}));
 
 describe('StorageEngine', () => {
   let storageEngine: StorageEngine;

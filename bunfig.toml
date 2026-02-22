@@ -1,0 +1,10 @@
+[test]
+# Test file root and timeout
+root = "./src"
+timeout = 10000
+preload = ["./src/__tests__/preload.ts", "./src/__tests__/setup.ts"]
+
+# Coverage settings
+coverageThreshold = { lines = 75, functions = 75, statements = 75, branches = 69 }
+coverageReporter = ["text", "lcov"]
+coverageDir = "coverage"
