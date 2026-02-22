@@ -50,7 +50,7 @@
     "vault",
     "sdk",
     "typescript",
-    "nodejs",
+    "node",
     "bun"
   ],
   "author": "Waren Gonzaga <waren@wgtechlabs.com> (https://wgtechlabs.com)",
