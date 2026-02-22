@@ -1,4 +1,4 @@
-name: Package Build Flow
+name: Package
 
 on:
   pull_request:
@@ -8,20 +8,23 @@ on:
       - dev
 
 jobs:
-  build:
+  build-and-package:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - uses: wgtechlabs/package-build-flow-action@v2.0.1
+      - name: Build and Package
+        uses: wgtechlabs/package-build-flow-action@v2.0.1
         with:
           npm-token: ${{ secrets.NPM_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
