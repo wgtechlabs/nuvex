@@ -12,7 +12,6 @@
  * - Automatic cleanup of expired entries
  * 
  * @author Waren Gonzaga, WG Technology Labs
- * @version 1.0.0
  * @since 2025
  */
 
@@ -238,6 +237,56 @@ export class MemoryStorage implements StorageLayerInterface {
   async clear(): Promise<void> {
     this.cache.clear();
     this.log('info', 'Memory L1: Cache cleared');
+  }
+
+  /**
+   * Get all keys matching an optional pattern
+   * 
+   * Returns all non-expired keys from the memory cache, optionally filtered
+   * by a glob pattern. Supports '*' (match any characters) and '?' (match single character).
+   * 
+   * @param pattern - Optional glob pattern (default: '*' returns all keys)
+   * @returns Promise resolving to array of matching keys
+   * 
+   * @example
+   * ```typescript
+   * // Get all keys
+   * const allKeys = await memory.keys();
+   * 
+   * // Get keys matching pattern
+   * const userKeys = await memory.keys('user:*');
+   * ```
+   */
+  async keys(pattern?: string): Promise<string[]> {
+    const now = Date.now();
+    const matchingKeys: string[] = [];
+    
+    for (const [key, entry] of this.cache.entries()) {
+      // Skip expired entries
+      if (entry.expires && now > entry.expires) {
+        this.cache.delete(key);
+        continue;
+      }
+      
+      // If no pattern or wildcard, include all keys
+      if (!pattern || pattern === '*') {
+        matchingKeys.push(key);
+        continue;
+      }
+      
+      // Simple glob pattern matching
+      // Escape regex special chars, then convert glob wildcards
+      const escaped = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+      const regex = new RegExp(`^${escaped}$`);
+      if (regex.test(key)) {
+        matchingKeys.push(key);
+      }
+    }
+    
+    return matchingKeys;
   }
 
   /**
