@@ -405,7 +405,7 @@ describe('NuvexClient', () => {
 
     test('should handle cleanup errors', async () => {
       // Mock storage to throw error
-      jest.spyOn(client.storage, 'cleanupExpiredMemory').mockImplementation(() => {
+      jest.spyOn(client.getEngine(), 'cleanupExpiredMemory').mockImplementation(() => {
         throw new Error('Cleanup failed');
       });
 
@@ -452,7 +452,7 @@ describe('NuvexClient', () => {
 
     test('should handle backup errors', async () => {
       // Mock storage.keys to throw error
-      jest.spyOn(client.storage, 'keys').mockRejectedValue(new Error('Keys failed'));
+      jest.spyOn(client.getEngine(), 'keys').mockRejectedValue(new Error('Keys failed'));
 
       await expect(client.backup()).rejects.toThrow('Keys failed');
     });

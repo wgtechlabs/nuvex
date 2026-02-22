@@ -257,8 +257,6 @@ describe('StorageEngine', () => {
   });
 
   describe('Query Operations', () => {
-    // TODO: Update these tests - keys() method needs to be reimplemented for modular layers
-    
     beforeEach(async () => {
       // Set up test data
       await storageEngine.set('user:1', { name: 'Alice' });
@@ -267,14 +265,14 @@ describe('StorageEngine', () => {
       await storageEngine.set('config:app', { theme: 'dark' });
     });
 
-    test.skip('should find keys by pattern', async () => {
+    test('should find keys by pattern', async () => {
       const keys = await storageEngine.keys('user:*');
       expect(keys).toContain('user:1');
       expect(keys).toContain('user:2');
       expect(keys).not.toContain('session:1');
     });
 
-    test.skip('should query with options', async () => {
+    test('should query with options', async () => {
       const result = await storageEngine.query({
         pattern: 'user:*',
         limit: 1
@@ -282,6 +280,48 @@ describe('StorageEngine', () => {
       
       expect(result.items).toHaveLength(1);
       expect(result.hasMore).toBe(true);
+    });
+  });
+
+  describe('keys()', () => {
+    test('should return all keys when no pattern specified', async () => {
+      await storageEngine.set('key1', 'value1');
+      await storageEngine.set('key2', 'value2');
+      await storageEngine.set('key3', 'value3');
+      
+      const keys = await storageEngine.keys();
+      expect(keys).toHaveLength(3);
+      expect(keys).toContain('key1');
+      expect(keys).toContain('key2');
+      expect(keys).toContain('key3');
+    });
+
+    test('should return keys matching pattern', async () => {
+      await storageEngine.set('user:1', 'data1');
+      await storageEngine.set('user:2', 'data2');
+      await storageEngine.set('session:1', 'data3');
+      
+      const keys = await storageEngine.keys('user:*');
+      expect(keys).toHaveLength(2);
+      expect(keys).toContain('user:1');
+      expect(keys).toContain('user:2');
+    });
+
+    test('should skip expired entries', async () => {
+      await storageEngine.set('active:1', 'data1');
+      await storageEngine.set('expired:1', 'data2', { ttl: 1 });
+      
+      // Wait for expiration
+      await new Promise(resolve => setTimeout(resolve, 1100));
+      
+      const keys = await storageEngine.keys();
+      expect(keys).toContain('active:1');
+      expect(keys).not.toContain('expired:1');
+    });
+
+    test('should return empty array when no keys exist', async () => {
+      const keys = await storageEngine.keys();
+      expect(keys).toHaveLength(0);
     });
   });
 
