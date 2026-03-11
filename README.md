@@ -80,6 +80,7 @@ const results = await storage.setBatch([
 
 // Health monitoring
 const health = await storage.healthCheck();
+console.log('All configured layers healthy:', Object.values(health).every(Boolean));
 console.log('PostgreSQL ready:', health.postgres);
 ```
 
