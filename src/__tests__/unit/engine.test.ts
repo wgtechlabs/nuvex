@@ -8,7 +8,7 @@
  * @fileoverview Engine unit tests with zero hardcoded credentials
  */
 
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { StorageEngine } from '../../core/engine.js';
 import { StorageLayer } from '../../types/index.js';
 import { mockNuvexConfig } from '../fixtures/data.js';
@@ -42,6 +42,18 @@ describe('StorageEngine', () => {
       
       await storageEngine.connect();
       expect(storageEngine.isConnected()).toBe(true);
+    });
+
+    test('should report postgres unhealthy when connectivity is alive but schema is not ready', async () => {
+      const postgresLayer = (storageEngine as any).l3Postgres;
+      postgresLayer.ping = mock().mockResolvedValue(true);
+      postgresLayer.isReady = mock().mockResolvedValue(false);
+
+      const health = await storageEngine.healthCheck('postgres');
+
+      expect(health).toEqual({ postgres: false });
+      expect(postgresLayer.isReady).toHaveBeenCalled();
+      expect(postgresLayer.ping).not.toHaveBeenCalled();
     });
   });
 

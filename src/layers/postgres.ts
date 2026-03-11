@@ -20,9 +20,10 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 import type { Pool as PoolType } from 'pg';
+import { randomUUID } from 'node:crypto';
 import type { StorageLayerInterface, Logger } from '../interfaces/index.js';
 import type { PostgresConfig } from '../types/index.js';
-import { validateSQLIdentifier } from '../core/database.js';
+import { setupNuvexSchema, validateSQLIdentifier } from '../core/database.js';
 
 /**
  * PostgreSQL Storage Layer - L3 Persistent Storage
@@ -108,6 +109,18 @@ export class PostgresStorage implements StorageLayerInterface {
   /** Value/data column name */
   private readonly valueColumn: string;
 
+  /** Whether schema should be created automatically during startup */
+  private readonly autoSetupSchema: boolean;
+
+  /** Whether pg_trgm support should be enabled during schema setup */
+  private readonly enableTrigram: boolean;
+
+  /** Whether cleanup job should be enabled during schema setup */
+  private readonly enableCleanupJob: boolean;
+
+  /** Last known readiness state for the configured Nuvex schema */
+  private schemaReady: boolean;
+
   /**
    * Creates a new PostgresStorage instance
    * 
@@ -144,6 +157,7 @@ export class PostgresStorage implements StorageLayerInterface {
     this.pool = null;
     this.connected = false;
     this.logger = logger;
+    this.schemaReady = false;
     
     // Check if config is already a Pool instance
     this.ownsPool = !('query' in config && typeof config.query === 'function');
@@ -154,6 +168,9 @@ export class PostgresStorage implements StorageLayerInterface {
     this.tableName = schema?.tableName ?? 'nuvex_storage';
     this.keyColumn = schema?.columns?.key ?? 'nuvex_key';
     this.valueColumn = schema?.columns?.value ?? 'nuvex_data';
+    this.autoSetupSchema = this.ownsPool ? Boolean((config as PostgresConfig).autoSetupSchema) : false;
+    this.enableTrigram = this.ownsPool ? Boolean((config as PostgresConfig).enableTrigram) : false;
+    this.enableCleanupJob = this.ownsPool ? Boolean((config as PostgresConfig).enableCleanupJob) : false;
     
     // Validate all identifiers to prevent SQL injection
     validateSQLIdentifier(this.tableName, 'table name');
@@ -193,10 +210,35 @@ export class PostgresStorage implements StorageLayerInterface {
       if (this.pool) {
         await this.pool.query('SELECT 1');
         this.connected = true;
-        this.log('info', 'PostgreSQL L3: Connected successfully');
+
+        if (this.autoSetupSchema) {
+          this.log('info', 'PostgreSQL L3: Auto-setup enabled, ensuring Nuvex schema exists', {
+            tableName: this.tableName,
+            enableTrigram: this.enableTrigram,
+            enableCleanupJob: this.enableCleanupJob
+          });
+          await setupNuvexSchema(this.pool, {
+            enableTrigram: this.enableTrigram,
+            enableCleanupJob: this.enableCleanupJob,
+            schema: {
+              tableName: this.tableName,
+              columns: {
+                key: this.keyColumn,
+                value: this.valueColumn
+              }
+            }
+          }, this.logger ?? undefined);
+        }
+
+        this.schemaReady = await this.isReady();
+        this.log('info', 'PostgreSQL L3: Connected successfully', {
+          tableName: this.tableName,
+          ready: this.schemaReady
+        });
       }
     } catch (error) {
       this.connected = false;
+      this.schemaReady = false;
       this.log('error', 'PostgreSQL L3: Connection failed', { 
         error: error instanceof Error ? error.message : String(error) 
       });
@@ -221,6 +263,7 @@ export class PostgresStorage implements StorageLayerInterface {
       this.log('info', 'PostgreSQL L3: Disconnected');
     }
     this.connected = false;
+    this.schemaReady = false;
   }
 
   /**
@@ -258,10 +301,7 @@ export class PostgresStorage implements StorageLayerInterface {
       // Value is already parsed by PostgreSQL JSONB type
       return result.rows[0][this.valueColumn];
     } catch (error) {
-      // Table might not exist yet, that's okay
-      this.log('debug', `PostgreSQL L3: Error getting key: ${key}`, { 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+      this.handleQueryError('get', error, { key });
       return null;
     }
   }
@@ -401,11 +441,11 @@ export class PostgresStorage implements StorageLayerInterface {
   }
 
   /**
-   * Health check for PostgreSQL connection
+   * Health check for PostgreSQL connectivity
    * 
    * Executes a simple SELECT 1 query to verify connectivity and database
-   * responsiveness. This is a lightweight operation that tests the full
-   * connection path including pool, connection, and database.
+   * responsiveness. This is a lightweight connectivity check only and does
+   * not guarantee that the configured Nuvex schema exists or is writable.
    * 
    * @returns Promise resolving to true if PostgreSQL is healthy and responsive
    * 
@@ -437,6 +477,94 @@ export class PostgresStorage implements StorageLayerInterface {
         error: error instanceof Error ? error.message : String(error) 
       });
       return false;
+    }
+  }
+
+  /**
+   * Check whether the configured Nuvex PostgreSQL schema is ready for use.
+   *
+   * Verifies that the configured storage table exists with the expected
+   * columns and that writes can succeed inside a rolled-back transaction.
+   *
+   * @returns Promise resolving to true when storage is usable
+   */
+  async isReady(): Promise<boolean> {
+    if (!this.connected || !this.pool) {
+      this.schemaReady = false;
+      return false;
+    }
+
+    let client;
+    try {
+      client = await this.pool.connect();
+
+      const tableResult = await client.query(
+        'SELECT to_regclass($1) as table_name',
+        [this.tableName]
+      );
+      if (!tableResult.rows[0]?.table_name) {
+        this.schemaReady = false;
+        this.log('warn', 'PostgreSQL L3: Nuvex schema is not ready - storage table is missing', {
+          tableName: this.tableName,
+          autoSetupSchema: this.autoSetupSchema
+        });
+        return false;
+      }
+
+      const columnsResult = await client.query(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_name = $1
+           AND column_name IN ($2, $3)`,
+        [this.tableName, this.keyColumn, this.valueColumn]
+      );
+
+      const availableColumns = new Set(
+        columnsResult.rows.map((row: Record<string, string>) => row.column_name)
+      );
+      if (!availableColumns.has(this.keyColumn) || !availableColumns.has(this.valueColumn)) {
+        this.schemaReady = false;
+        this.log('warn', 'PostgreSQL L3: Nuvex schema is not ready - expected columns are missing', {
+          tableName: this.tableName,
+          keyColumn: this.keyColumn,
+          valueColumn: this.valueColumn
+        });
+        return false;
+      }
+
+      const readinessKey = `__nuvex_readiness__:${randomUUID()}`;
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO ${this.tableName} (${this.keyColumn}, ${this.valueColumn}, expires_at)
+         VALUES ($1, $2::jsonb, NULL)
+         ON CONFLICT (${this.keyColumn})
+         DO UPDATE SET ${this.valueColumn} = EXCLUDED.${this.valueColumn}, updated_at = NOW()`,
+        [readinessKey, JSON.stringify({ ready: true })]
+      );
+      await client.query('ROLLBACK');
+
+      this.schemaReady = true;
+      return true;
+    } catch (error) {
+      if (client) {
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          // Ignore rollback failures when readiness already failed
+        }
+      }
+
+      this.handleQueryError('readiness', error, {
+        tableName: this.tableName,
+        keyColumn: this.keyColumn,
+        valueColumn: this.valueColumn
+      });
+      this.schemaReady = false;
+      return false;
+    } finally {
+      if (client) {
+        client.release();
+      }
     }
   }
 
@@ -541,5 +669,30 @@ export class PostgresStorage implements StorageLayerInterface {
     if (this.logger) {
       this.logger[level](message, meta);
     }
+  }
+
+  private handleQueryError(operation: string, error: unknown, meta: Record<string, unknown> = {}): void {
+    const pgError = error as { code?: string; message?: string };
+    const details = {
+      ...meta,
+      tableName: this.tableName,
+      keyColumn: this.keyColumn,
+      valueColumn: this.valueColumn,
+      error: pgError.message ?? String(error)
+    };
+
+    if (pgError.code === '42P01') {
+      this.schemaReady = false;
+      this.log('warn', `PostgreSQL L3: ${operation} failed because the Nuvex schema is missing`, details);
+      return;
+    }
+
+    if (pgError.code === '42703') {
+      this.schemaReady = false;
+      this.log('warn', `PostgreSQL L3: ${operation} failed because the Nuvex schema is incompatible`, details);
+      return;
+    }
+
+    this.log(operation === 'get' ? 'debug' : 'error', `PostgreSQL L3: ${operation} failed`, details);
   }
 }

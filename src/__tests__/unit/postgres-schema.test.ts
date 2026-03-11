@@ -19,9 +19,17 @@ describe('PostgreSQL Configurable Schema', () => {
       expect(sql).toContain('nuvex_key VARCHAR(512) NOT NULL UNIQUE');
       expect(sql).toContain('nuvex_data JSONB NOT NULL');
       expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_nuvex_storage_expires_at');
-      expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_nuvex_storage_key_pattern');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION update_nuvex_storage_updated_at()');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION cleanup_expired_nuvex_storage()');
+      expect(sql).not.toContain('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+      expect(sql).not.toContain('CREATE INDEX IF NOT EXISTS idx_nuvex_storage_key_pattern');
+    });
+
+    it('should generate trigram schema SQL only when enabled', () => {
+      const sql = generateNuvexSchemaSQL(undefined, { enableTrigram: true });
+
+      expect(sql).toContain('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+      expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_nuvex_storage_key_pattern');
     });
 
     it('should reject invalid table names with SQL injection attempts', () => {
@@ -179,7 +187,6 @@ describe('PostgreSQL Configurable Schema', () => {
       expect(sql).toContain('key VARCHAR(512) NOT NULL UNIQUE');
       expect(sql).toContain('value JSONB NOT NULL');
       expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_storage_cache_expires_at');
-      expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_storage_cache_key_pattern');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION update_storage_cache_updated_at()');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION cleanup_expired_storage_cache()');
     });
@@ -199,7 +206,6 @@ describe('PostgreSQL Configurable Schema', () => {
       expect(sql).toContain('cache_key VARCHAR(512) NOT NULL UNIQUE');
       expect(sql).toContain('data JSONB NOT NULL');
       expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_storage_cache_expires_at');
-      expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_storage_cache_key_pattern');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION update_storage_cache_updated_at()');
       expect(sql).toContain('CREATE OR REPLACE FUNCTION cleanup_expired_storage_cache()');
     });
@@ -396,6 +402,153 @@ describe('PostgreSQL Configurable Schema', () => {
       };
       
       expect(() => new PostgresStorage(config)).toThrow('Invalid key column name');
+    });
+  });
+
+  describe('PostgresStorage readiness and auto setup', () => {
+    const createReadyPool = (options: {
+      tableExists?: boolean;
+      columns?: string[];
+      createTableOnSetup?: boolean;
+      failSelectWithMissingTable?: boolean;
+    } = {}) => {
+      let tableExists = options.tableExists ?? true;
+      let currentTableName = 'nuvex_storage';
+      const columns = options.columns ?? ['nuvex_key', 'nuvex_data'];
+
+      const queryImpl = mock((sql: string, params?: unknown[]) => {
+        if (sql === 'SELECT 1') {
+          return Promise.resolve({ rows: [{ '?column?': 1 }], rowCount: 1 });
+        }
+
+        if (sql.includes('CREATE TABLE IF NOT EXISTS')) {
+          if (options.createTableOnSetup !== false) {
+            tableExists = true;
+          }
+          const match = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/);
+          if (match) {
+            currentTableName = match[1];
+          }
+          return Promise.resolve({ rows: [], rowCount: 0 });
+        }
+
+        if (sql.includes('SELECT nuvex_data FROM nuvex_storage') && options.failSelectWithMissingTable) {
+          return Promise.reject(Object.assign(new Error('relation "nuvex_storage" does not exist'), { code: '42P01' }));
+        }
+
+        return Promise.resolve({ rows: [], rowCount: 0, params });
+      });
+
+      const clientQuery = mock((sql: string, params?: unknown[]) => {
+        if (sql === 'SELECT 1') {
+          return Promise.resolve({ rows: [{ '?column?': 1 }], rowCount: 1 });
+        }
+
+        if (sql.includes('SELECT to_regclass')) {
+          return Promise.resolve({
+            rows: [{ table_name: tableExists ? (params?.[0] ?? currentTableName) : null }],
+            rowCount: 1
+          });
+        }
+
+        if (sql.includes('FROM information_schema.columns')) {
+          return Promise.resolve({
+            rows: columns.map((column_name) => ({ column_name })),
+            rowCount: columns.length
+          });
+        }
+
+        if (sql === 'BEGIN' || sql === 'ROLLBACK') {
+          return Promise.resolve({ rows: [], rowCount: 0 });
+        }
+
+        if (sql.includes('INSERT INTO')) {
+          if (!tableExists) {
+            return Promise.reject(Object.assign(new Error(`relation "${currentTableName}" does not exist`), { code: '42P01' }));
+          }
+          return Promise.resolve({ rows: [], rowCount: 1 });
+        }
+
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      });
+
+      return {
+        query: queryImpl,
+        connect: mock().mockResolvedValue({
+          query: clientQuery,
+          release: mock()
+        }),
+        end: mock()
+      };
+    };
+
+    it('should report postgres not ready when connection succeeds but schema is missing', async () => {
+      const logger = {
+        debug: mock(),
+        info: mock(),
+        warn: mock(),
+        error: mock()
+      };
+      const pool = createReadyPool({ tableExists: false });
+      const storage = new PostgresStorage(pool as unknown as PoolType, logger);
+
+      await storage.connect();
+
+      expect(await storage.ping()).toBe(true);
+      expect(await storage.isReady()).toBe(false);
+      expect(logger.warn).toHaveBeenCalledWith(
+        'PostgreSQL L3: Nuvex schema is not ready - storage table is missing',
+        expect.objectContaining({ tableName: 'nuvex_storage' })
+      );
+    });
+
+    it('should auto setup schema and become ready on a fresh database', async () => {
+      const pool = createReadyPool({ tableExists: false });
+      const storage = new PostgresStorage(pool as unknown as PoolType);
+
+      (storage as any).autoSetupSchema = true;
+
+      await storage.connect();
+
+      expect(await storage.isReady()).toBe(true);
+      await expect(storage.set('fresh:key', { ok: true })).resolves.toBeUndefined();
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('CREATE TABLE IF NOT EXISTS nuvex_storage'));
+    });
+
+    it('should honor custom schema when auto setup is enabled', async () => {
+      const pool = createReadyPool({ tableExists: false, columns: ['key', 'value'] });
+      const storage = new PostgresStorage(pool as unknown as PoolType);
+
+      (storage as any).autoSetupSchema = true;
+      (storage as any).tableName = 'storage_cache';
+      (storage as any).keyColumn = 'key';
+      (storage as any).valueColumn = 'value';
+
+      await storage.connect();
+
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('CREATE TABLE IF NOT EXISTS storage_cache'));
+    });
+
+    it('should log missing schema errors on get instead of silently treating them as cache misses', async () => {
+      const logger = {
+        debug: mock(),
+        info: mock(),
+        warn: mock(),
+        error: mock()
+      };
+      const pool = createReadyPool({
+        tableExists: true,
+        failSelectWithMissingTable: true
+      });
+      const storage = new PostgresStorage(pool as unknown as PoolType, logger);
+
+      await storage.connect();
+
+      await expect(storage.get('missing:schema')).resolves.toBeNull();
+      expect(logger.warn).toHaveBeenCalledWith(
+        'PostgreSQL L3: get failed because the Nuvex schema is missing',
+        expect.objectContaining({ key: 'missing:schema' })
+      );
     });
   });
 });

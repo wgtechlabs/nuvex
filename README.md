@@ -57,7 +57,8 @@ const storage = await NuvexClient.initialize({
     port: 5432,
     database: 'myapp',
     user: 'postgres',
-    password: 'password'
+    password: 'password',
+    autoSetupSchema: true
   },
   redis: { url: 'redis://localhost:6379' } // Optional but recommended
 });
@@ -79,7 +80,7 @@ const results = await storage.setBatch([
 
 // Health monitoring
 const health = await storage.healthCheck();
-console.log('Storage healthy:', health.overall);
+console.log('PostgreSQL ready:', health.postgres);
 ```
 
 ## 📦 Installation
@@ -113,7 +114,8 @@ const config = {
     port: 5432,
     database: 'myapp',
     user: 'postgres',
-    password: 'password'
+    password: 'password',
+    autoSetupSchema: true
   },
   redis: { url: 'redis://localhost:6379' }, // Optional but recommended
   memory: { ttl: 86400000, maxSize: 10000 }, // Optional
@@ -125,6 +127,10 @@ const config = {
 
 Nuvex uses strongly branded table and column names by default (`nuvex_storage`, `nuvex_key`, `nuvex_data`). For backwards compatibility with existing applications, you can customize these names:
 
+- `autoSetupSchema: true` creates the configured Nuvex schema during startup.
+- When `autoSetupSchema` is omitted or `false`, Nuvex only connects to PostgreSQL and `healthCheck().postgres` reports whether the configured Nuvex storage schema is actually usable.
+- `enableTrigram: true` opts into `pg_trgm` extension setup and the trigram index during schema creation.
+
 ```typescript
 // Default configuration (recommended for new apps)
 const storage = await NuvexClient.initialize({
@@ -133,7 +139,8 @@ const storage = await NuvexClient.initialize({
     port: 5432,
     database: 'myapp',
     user: 'postgres',
-    password: 'password'
+    password: 'password',
+    autoSetupSchema: true
     // Uses: table 'nuvex_storage', columns 'nuvex_key' and 'nuvex_data'
   }
 });
@@ -146,6 +153,7 @@ const storage = await NuvexClient.initialize({
     database: 'telegram_bot',
     user: 'postgres',
     password: 'password',
+    autoSetupSchema: true,
     schema: {
       tableName: 'storage_cache',
       columns: {
@@ -164,6 +172,7 @@ const storage = await NuvexClient.initialize({
     database: 'discord_bot',
     user: 'postgres',
     password: 'password',
+    autoSetupSchema: true,
     schema: {
       tableName: 'storage_cache',
       columns: {
@@ -182,6 +191,8 @@ const storage = await NuvexClient.initialize({
 | **Nuvex** (default) | nuvex_storage   | nuvex_key     | nuvex_data    |
 | Telegram Bot  | storage_cache   | key           | value         |
 | Discord Bot   | storage_cache   | cache_key     | data          |
+
+If you manage schema creation yourself, call `setupNuvexSchema()` before serving traffic or ensure your deployment creates the table ahead of time. Otherwise, PostgreSQL connectivity may succeed while `healthCheck().postgres` correctly reports that Nuvex storage is not ready.
 
 ### API Reference
 
@@ -212,7 +223,9 @@ await storage.decrement('counter', 2);
 ```typescript
 // Health monitoring
 const health = await storage.healthCheck();
-console.log('All systems:', health.overall ? '✅' : '❌');
+console.log('Memory:', health.memory ? '✅' : '❌');
+console.log('Redis:', health.redis ? '✅' : '❌');
+console.log('PostgreSQL ready:', health.postgres ? '✅' : '❌');
 
 // Performance metrics
 const metrics = storage.getMetrics();

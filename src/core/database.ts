@@ -46,6 +46,11 @@ export function validateSQLIdentifier(identifier: string, name: string): void {
   }
 }
 
+export interface SchemaGenerationOptions {
+  /** Include pg_trgm extension setup and trigram key index */
+  enableTrigram?: boolean;
+}
+
 /**
  * Generate SQL schema for Nuvex storage with configurable table and column names
  * 
@@ -53,7 +58,10 @@ export function validateSQLIdentifier(identifier: string, name: string): void {
  * @returns SQL string for creating the schema
  * @throws {Error} If table or column names contain invalid characters
  */
-export function generateNuvexSchemaSQL(schema?: PostgresSchemaConfig): string {
+export function generateNuvexSchemaSQL(
+  schema?: PostgresSchemaConfig,
+  options: SchemaGenerationOptions = {}
+): string {
   const tableName = schema?.tableName ?? 'nuvex_storage';
   const keyColumn = schema?.columns?.key ?? 'nuvex_key';
   const valueColumn = schema?.columns?.value ?? 'nuvex_data';
@@ -78,13 +86,14 @@ CREATE TABLE IF NOT EXISTS ${tableName} (
 CREATE INDEX IF NOT EXISTS idx_${tableName}_expires_at 
 ON ${tableName}(expires_at) 
 WHERE expires_at IS NOT NULL;
-
+${options.enableTrigram ? `
 -- Ensure pg_trgm extension is available for GIN index
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Index for key pattern searches
 CREATE INDEX IF NOT EXISTS idx_${tableName}_key_pattern 
 ON ${tableName} USING gin(${keyColumn} gin_trgm_ops);
+` : ''}
 
 -- Function to auto-update updated_at
 CREATE OR REPLACE FUNCTION update_${tableName}_updated_at()
@@ -182,7 +191,9 @@ export async function setupNuvexSchema(
     }
     
     // Generate schema SQL with custom table/column names if provided
-    const schemaSQL = options.schema ? generateNuvexSchemaSQL(options.schema) : NUVEX_SCHEMA_SQL;
+    const schemaSQL = generateNuvexSchemaSQL(options.schema, {
+      enableTrigram: options.enableTrigram
+    });
     
     // Execute main schema
     await db.query(schemaSQL);

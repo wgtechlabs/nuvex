@@ -63,6 +63,12 @@ export interface PostgresConfig {
   connectionTimeoutMillis?: number;
   /** Schema configuration for table and column names (optional) */
   schema?: PostgresSchemaConfig;
+  /** Automatically create the Nuvex schema during startup when missing */
+  autoSetupSchema?: boolean;
+  /** Enable pg_trgm extension and trigram index during schema setup */
+  enableTrigram?: boolean;
+  /** Schedule automatic cleanup with pg_cron during schema setup */
+  enableCleanupJob?: boolean;
 }
 
 /**
