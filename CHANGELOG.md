@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
 
-
-
+- update github actions
+- migrate from eslint to biome for linting and formatting
+- ignore `.contributerc.json` config file
 
 ## [0.2.1] - 2026-03-12
 
