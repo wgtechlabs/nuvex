@@ -3,8 +3,22 @@
  * Tests for the main client class functionality
  */
 
-import { describe, test, it, expect, beforeEach, afterEach, beforeAll, afterAll, mock, spyOn } from 'bun:test';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+  mock,
+  spyOn,
+} from 'bun:test';
 import { NuvexClient } from '../../core/client.js';
+import { StorageLayer } from '../../types/index.js';
 import { mockNuvexConfig } from '../fixtures/data.js';
 
 describe('NuvexClient', () => {
@@ -79,7 +93,7 @@ describe('NuvexClient', () => {
   describe('Health Check', () => {
     test('should return health status for all layers', async () => {
       const health = await client.healthCheck();
-      
+
       expect(health).toHaveProperty('memory');
       expect(health).toHaveProperty('redis');
       expect(health).toHaveProperty('postgres');
@@ -87,7 +101,7 @@ describe('NuvexClient', () => {
 
     test('should check specific layer - memory', async () => {
       const health = await client.healthCheck('memory');
-      
+
       expect(health).toHaveProperty('memory');
       expect(health).not.toHaveProperty('redis');
       expect(health).not.toHaveProperty('postgres');
@@ -95,7 +109,7 @@ describe('NuvexClient', () => {
 
     test('should check specific layer - redis', async () => {
       const health = await client.healthCheck('redis');
-      
+
       expect(health).toHaveProperty('redis');
       expect(health).not.toHaveProperty('memory');
       expect(health).not.toHaveProperty('postgres');
@@ -103,7 +117,7 @@ describe('NuvexClient', () => {
 
     test('should check specific layer - postgres', async () => {
       const health = await client.healthCheck('postgres');
-      
+
       expect(health).toHaveProperty('postgres');
       expect(health).not.toHaveProperty('memory');
       expect(health).not.toHaveProperty('redis');
@@ -111,7 +125,7 @@ describe('NuvexClient', () => {
 
     test('should check multiple specific layers', async () => {
       const health = await client.healthCheck(['memory', 'redis']);
-      
+
       expect(health).toHaveProperty('memory');
       expect(health).toHaveProperty('redis');
       expect(health).not.toHaveProperty('postgres');
@@ -123,13 +137,13 @@ describe('NuvexClient', () => {
       const updates = {
         memory: {
           ttl: 7200000,
-          maxSize: 2000
-        }
+          maxSize: 2000,
+        },
       };
 
       await client.configure(updates);
       const config = client.getConfig();
-      
+
       expect(config.memory?.ttl).toBe(7200000);
       expect(config.memory?.maxSize).toBe(2000);
     });
@@ -143,7 +157,7 @@ describe('NuvexClient', () => {
       await client.set('metric2', { data: 2 });
 
       const metrics = client.getMetrics();
-      
+
       expect(metrics).toHaveProperty('memoryHits');
       expect(metrics).toHaveProperty('memoryMisses');
       expect(metrics).toHaveProperty('totalOperations');
@@ -152,7 +166,7 @@ describe('NuvexClient', () => {
 
     test('should get memory-specific metrics', async () => {
       const metrics = client.getMetrics('memory');
-      
+
       expect(metrics).toHaveProperty('memoryHits');
       expect(metrics).toHaveProperty('memoryMisses');
       expect(metrics).toHaveProperty('memorySize');
@@ -163,7 +177,7 @@ describe('NuvexClient', () => {
 
     test('should get redis-specific metrics', async () => {
       const metrics = client.getMetrics('redis');
-      
+
       expect(metrics).toHaveProperty('redisHits');
       expect(metrics).toHaveProperty('redisMisses');
       expect(metrics).not.toHaveProperty('memoryHits');
@@ -172,7 +186,7 @@ describe('NuvexClient', () => {
 
     test('should get postgres-specific metrics', async () => {
       const metrics = client.getMetrics('postgres');
-      
+
       expect(metrics).toHaveProperty('postgresHits');
       expect(metrics).toHaveProperty('postgresMisses');
       expect(metrics).not.toHaveProperty('memoryHits');
@@ -181,7 +195,7 @@ describe('NuvexClient', () => {
 
     test('should get metrics for multiple layers', async () => {
       const metrics = client.getMetrics(['memory', 'redis']);
-      
+
       expect(metrics).toHaveProperty('memoryHits');
       expect(metrics).toHaveProperty('redisHits');
       expect(metrics).not.toHaveProperty('postgresHits');
@@ -191,7 +205,7 @@ describe('NuvexClient', () => {
 
     test('should get all metrics with "all" parameter', async () => {
       const metrics = client.getMetrics('all');
-      
+
       expect(metrics).toHaveProperty('memoryHits');
       expect(metrics).toHaveProperty('redisHits');
       expect(metrics).toHaveProperty('postgresHits');
@@ -200,17 +214,17 @@ describe('NuvexClient', () => {
 
     test('should reset metrics', async () => {
       await client.set('test', { data: 'test' });
-      
+
       client.resetMetrics();
       const metrics = client.getMetrics();
-      
+
       expect(metrics.totalOperations).toBe(0);
     });
   });
   describe('Error Handling', () => {
     test('should handle storage errors gracefully', async () => {
       await client.disconnect();
-      
+
       const result = await client.set('test', { data: 'fail' });
       expect(result).toBe(false);
     });
@@ -248,7 +262,7 @@ describe('NuvexClient', () => {
 
     test('should perform static operations', async () => {
       await NuvexClient.initialize(mockNuvexConfig);
-      
+
       const stored = await NuvexClient.set('static:test', { data: 'static' });
       expect(stored).toBe(true);
 
@@ -276,12 +290,12 @@ describe('NuvexClient', () => {
       const operations = [
         { operation: 'set' as const, key: 'batch1', value: { data: 1 } },
         { operation: 'set' as const, key: 'batch2', value: { data: 2 } },
-        { operation: 'set' as const, key: 'batch3', value: { data: 3 } }
+        { operation: 'set' as const, key: 'batch3', value: { data: 3 } },
       ];
 
       const results = await client.setBatch(operations);
       expect(results).toHaveLength(3);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.success).toBe(true);
       });
     });
@@ -303,15 +317,14 @@ describe('NuvexClient', () => {
 
       const results = await client.deleteBatch(['del1', 'del2']);
       expect(results).toHaveLength(2);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.success).toBe(true);
       });
     });
   });
 
   describe('Query Operations', () => {
-    // TODO: Update these tests - keys() method needs to be reimplemented
-    test.skip('should query data with options', async () => {
+    test('should query data with options', async () => {
       await client.set('query1', { name: 'test1' });
       await client.set('query2', { name: 'test2' });
 
@@ -319,7 +332,7 @@ describe('NuvexClient', () => {
       expect(result.items).toHaveLength(2);
     });
 
-    test.skip('should get keys with pattern', async () => {
+    test('should get keys with pattern', async () => {
       await client.set('pattern:1', { data: 1 });
       await client.set('pattern:2', { data: 2 });
       await client.set('other:1', { data: 3 });
@@ -330,7 +343,7 @@ describe('NuvexClient', () => {
       expect(keys).not.toContain('other:1');
     });
 
-    test.skip('should clear storage with pattern', async () => {
+    test('should clear storage with pattern', async () => {
       await client.set('clear:1', { data: 1 });
       await client.set('clear:2', { data: 2 });
       await client.set('keep:1', { data: 3 });
@@ -347,16 +360,17 @@ describe('NuvexClient', () => {
     // TODO: promote() may return false if Redis is not configured in mocks
     test.skip('should promote key to target layer', async () => {
       await client.set('promote:test', { data: 'promote' });
-      
+
       const promoted = await client.promote('promote:test', 'redis');
       expect(promoted).toBe(true);
-    });    test('should demote key to target layer', async () => {
+    });
+    test('should demote key to target layer', async () => {
       await client.set('demote:test', { data: 'demote' });
-      
+
       // Note: demote may return false if already in target layer
       const demoted = await client.demote('demote:test', 'memory');
       expect(typeof demoted).toBe('boolean');
-      
+
       // Enhanced: Check key is present in target layer and absent from original layer
       const layerInfo = await client.getLayerInfo('demote:test');
       expect(layerInfo && layerInfo.layer).toBe('memory');
@@ -365,7 +379,7 @@ describe('NuvexClient', () => {
 
     test('should get layer info', async () => {
       await client.set('layer:test', { data: 'layer' });
-      
+
       const layerInfo = await client.getLayerInfo('layer:test');
       expect(layerInfo).toHaveProperty('layer');
     });
@@ -374,7 +388,7 @@ describe('NuvexClient', () => {
   describe('TTL Operations', () => {
     test('should set expiration on key', async () => {
       await client.set('expire:test', { data: 'expire' });
-      
+
       const expired = await client.expire('expire:test', 60);
       expect(expired).toBe(true);
     });
@@ -395,9 +409,11 @@ describe('NuvexClient', () => {
 
     test('should handle cleanup errors', async () => {
       // Mock storage to throw error
-      spyOn(client.getEngine(), 'cleanupExpiredMemory').mockImplementation(() => {
-        throw new Error('Cleanup failed');
-      });
+      spyOn(client.getEngine(), 'cleanupExpiredMemory').mockImplementation(
+        () => {
+          throw new Error('Cleanup failed');
+        },
+      );
 
       const result = await client.cleanup();
       expect(result.errors).toBeGreaterThan(0);
@@ -425,7 +441,8 @@ describe('NuvexClient', () => {
 
       const backupId = await client.backup('custom-backup-id');
       expect(backupId).toBe('custom-backup-id');
-    });    test('should restore from backup', async () => {
+    });
+    test('should restore from backup', async () => {
       // First create a backup
       await client.set('restore:test', { data: 'restore' });
       const _backupId = await client.backup('test-restore');
@@ -435,6 +452,80 @@ describe('NuvexClient', () => {
       expect(restored).toBe(true);
     });
 
+    test('should restore backed up entries into durable storage', async () => {
+      const backupId = `test-durable-restore-${Date.now()}`;
+      const key = `restore:durable:${Date.now()}`;
+      const value = { data: 'durable' };
+      const backupDir = join(process.cwd(), 'nuvex-backups');
+
+      try {
+        await client.set(key, value, { layer: StorageLayer.MEMORY });
+        await client.backup(backupId);
+
+        await client.clear();
+        expect(await client.get(key)).toBeNull();
+
+        const restored = await client.restore(backupId);
+
+        expect(restored).toBe(true);
+        expect(await client.exists(key, { layer: StorageLayer.POSTGRES })).toBe(
+          true,
+        );
+      } finally {
+        await rm(join(backupDir, `${backupId}.json`), { force: true });
+        await rm(join(backupDir, `${backupId}.json.gz`), { force: true });
+      }
+    });
+
+    test('should restore entries with remaining absolute expiration', async () => {
+      const backupId = `test-expiring-restore-${Date.now()}`;
+      const key = `restore:ttl:${Date.now()}`;
+      const backupDir = join(process.cwd(), 'nuvex-backups');
+      const expiresAt = new Date(Date.now() + 2_000).toISOString();
+
+      try {
+        await mkdir(backupDir, { recursive: true });
+        await writeFile(
+          join(backupDir, `${backupId}.json`),
+          JSON.stringify(
+            {
+              metadata: {
+                id: backupId,
+                createdAt: new Date().toISOString(),
+                keyCount: 1,
+                type: 'full',
+                version: '1.0.0',
+              },
+              data: {
+                [key]: {
+                  value: { data: 'expires' },
+                  layerInfo: { layer: StorageLayer.POSTGRES },
+                  expiresAt,
+                  createdAt: new Date().toISOString(),
+                  version: '1.0.0',
+                },
+              },
+            },
+            null,
+            2,
+          ),
+        );
+
+        const restored = await client.restore(backupId);
+        const layerInfo = await client.getLayerInfo(key);
+
+        expect(restored).toBe(true);
+        expect(await client.get<{ data: string }>(key)).toEqual({
+          data: 'expires',
+        });
+        expect(layerInfo?.ttl).toBeGreaterThan(0);
+        expect(layerInfo?.ttl).toBeLessThanOrEqual(2);
+      } finally {
+        await rm(join(backupDir, `${backupId}.json`), { force: true });
+        await rm(join(backupDir, `${backupId}.json.gz`), { force: true });
+      }
+    });
+
     test('should fail to restore non-existent backup', async () => {
       const restored = await client.restore('non-existent-backup');
       expect(restored).toBe(false);
@@ -442,7 +533,9 @@ describe('NuvexClient', () => {
 
     test('should handle backup errors', async () => {
       // Mock storage.keys to throw error
-      spyOn(client.getEngine(), 'keys').mockRejectedValue(new Error('Keys failed'));
+      spyOn(client.getEngine(), 'keys').mockRejectedValue(
+        new Error('Keys failed'),
+      );
 
       await expect(client.backup()).rejects.toThrow('Keys failed');
     });
@@ -461,8 +554,7 @@ describe('NuvexClient', () => {
       expect(retrieved).toEqual(value);
     });
 
-    // TODO: Update these tests - keys() method needs to be reimplemented
-    test.skip('should get namespace keys', async () => {
+    test('should get namespace keys', async () => {
       await client.setNamespaced('ns', 'key1', { data: 1 });
       await client.setNamespaced('ns', 'key2', { data: 2 });
       await client.setNamespaced('other', 'key3', { data: 3 });
@@ -473,7 +565,7 @@ describe('NuvexClient', () => {
       expect(keys).not.toContain('key3');
     });
 
-    test.skip('should clear namespace', async () => {
+    test('should clear namespace', async () => {
       await client.setNamespaced('clear-ns', 'key1', { data: 1 });
       await client.setNamespaced('clear-ns', 'key2', { data: 2 });
       await client.setNamespaced('keep-ns', 'key3', { data: 3 });
@@ -489,7 +581,7 @@ describe('NuvexClient', () => {
   describe('Atomic Operations', () => {
     test('should increment numeric values', async () => {
       const key = 'counter';
-      
+
       // Test with non-existent key (should start at 0)
       let result = await client.increment(key);
       expect(result).toBe(1);
@@ -505,10 +597,10 @@ describe('NuvexClient', () => {
 
     test('should decrement numeric values', async () => {
       const key = 'countdown';
-      
+
       // Set initial value
       await client.set(key, 10);
-      
+
       // Test default decrement
       let result = await client.decrement(key);
       expect(result).toBe(9);
@@ -520,59 +612,59 @@ describe('NuvexClient', () => {
 
     test('should use atomic increment operations (sequential test)', async () => {
       const key = 'concurrent_counter';
-      
+
       // Test that increment works correctly in sequence
       // True atomicity is guaranteed by Redis/PostgreSQL in production
       let result = await client.increment(key);
       expect(result).toBe(1);
-      
+
       result = await client.increment(key);
       expect(result).toBe(2);
-      
+
       result = await client.increment(key);
       expect(result).toBe(3);
-      
+
       result = await client.increment(key);
       expect(result).toBe(4);
-      
+
       result = await client.increment(key);
       expect(result).toBe(5);
-      
+
       const finalValue = await client.get<number>(key);
       expect(finalValue).toBe(5);
     });
 
     test('should increment with custom delta (sequential test)', async () => {
       const key = 'concurrent_delta';
-      
+
       // Test increments with custom delta
       let result = await client.increment(key, 3);
       expect(result).toBe(3);
-      
+
       result = await client.increment(key, 3);
       expect(result).toBe(6);
-      
+
       result = await client.increment(key, 3);
       expect(result).toBe(9);
-      
+
       const finalValue = await client.get<number>(key);
       expect(finalValue).toBe(9);
     });
 
     test('should handle concurrent mixed increment and decrement', async () => {
       const key = 'concurrent_mixed';
-      
+
       // Set initial value
       await client.set(key, 10);
-      
+
       // Perform concurrent operations
       await Promise.all([
-        client.increment(key, 5),   // +5 = 15
-        client.decrement(key, 3),   // -3 = 12
-        client.increment(key, 2),   // +2 = 14
-        client.decrement(key, 1)    // -1 = 13
+        client.increment(key, 5), // +5 = 15
+        client.decrement(key, 3), // -3 = 12
+        client.increment(key, 2), // +2 = 14
+        client.decrement(key, 1), // -1 = 13
       ]);
-      
+
       // Final value should be 10 + 5 - 3 + 2 - 1 = 13
       const finalValue = await client.get<number>(key);
       expect(finalValue).toBe(13);
@@ -580,15 +672,15 @@ describe('NuvexClient', () => {
 
     test('should increment with TTL option', async () => {
       const key = 'counter_with_ttl';
-      
+
       // Increment with TTL (in milliseconds)
       const result = await client.increment(key, 1, 3600000); // 1 hour
       expect(result).toBe(1);
-      
+
       // Key should exist
       const exists = await client.exists(key);
       expect(exists).toBe(true);
-      
+
       // Value should be correct
       const value = await client.get<number>(key);
       expect(value).toBe(1);
@@ -596,7 +688,7 @@ describe('NuvexClient', () => {
 
     test('should initialize non-existent key to 0 before increment', async () => {
       const key = 'new_counter';
-      
+
       // First increment on non-existent key
       const result = await client.increment(key);
       expect(result).toBe(1);
@@ -604,9 +696,9 @@ describe('NuvexClient', () => {
 
     test('should handle negative increment (same as decrement)', async () => {
       const key = 'negative_increment';
-      
+
       await client.set(key, 10);
-      
+
       // Negative increment
       const result = await client.increment(key, -3);
       expect(result).toBe(7);
@@ -631,8 +723,7 @@ describe('NuvexClient', () => {
   });
 
   describe('Prefix Operations', () => {
-    // TODO: Update these tests - keys() method needs to be reimplemented
-    test.skip('should get values by prefix', async () => {
+    test('should get values by prefix', async () => {
       await client.set('prefix:key1', { data: 1 });
       await client.set('prefix:key2', { data: 2 });
       await client.set('other:key3', { data: 3 });
@@ -645,20 +736,21 @@ describe('NuvexClient', () => {
     });
   });
 
-  describe('Configuration with Logging', () => {    test('should handle logging configuration', async () => {
+  describe('Configuration with Logging', () => {
+    test('should handle logging configuration', async () => {
       const mockLogger = {
         debug: mock(),
         info: mock(),
         warn: mock(),
-        error: mock()
+        error: mock(),
       };
 
       const clientWithLogging = new NuvexClient({
         ...mockNuvexConfig,
         logging: {
           enabled: true,
-          logger: mockLogger
-        }
+          logger: mockLogger,
+        },
       });
 
       await clientWithLogging.connect();
@@ -666,19 +758,20 @@ describe('NuvexClient', () => {
 
       await clientWithLogging.disconnect();
       expect(mockLogger.info).toHaveBeenCalled();
-    });    test('should update logging configuration', async () => {
+    });
+    test('should update logging configuration', async () => {
       const newLogger = {
         debug: mock(),
         info: mock(),
         warn: mock(),
-        error: mock()
+        error: mock(),
       };
 
       await client.configure({
         logging: {
           enabled: true,
-          logger: newLogger
-        }
+          logger: newLogger,
+        },
       });
 
       // Trigger a log message

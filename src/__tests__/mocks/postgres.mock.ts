@@ -11,7 +11,7 @@ export interface MockQueryResult {
 
 export class MockPgPool {
   private tables = new Map<string, Map<string, any>>();
-  
+
   constructor() {
     this.tables = new Map();
     // Initialize the nuvex_storage table
@@ -39,29 +39,35 @@ export class MockPgClient {
 
   async query(text: string, params?: any[]): Promise<MockQueryResult> {
     const sql = text.toLowerCase().trim();
-    
+    const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+
     // Handle CREATE TABLE
     if (sql.includes('create table')) {
       // Updated regex: supports optional schema, case-insensitive
-      const tableMatch = text.match(/create\s+table\s+(?:if\s+not\s+exists\s+)?([\w.]+)/i);
+      const tableMatch = text.match(
+        /create\s+table\s+(?:if\s+not\s+exists\s+)?([\w.]+)/i,
+      );
       if (tableMatch) {
         const tableName = tableMatch[1].toLowerCase();
         this.tables.set(tableName, new Map());
       }
       return { rows: [], rowCount: 0, command: 'CREATE' };
     }
-    
+
     // Handle INSERT with ON CONFLICT (UPSERT) for nuvex_storage
-    if (sql.includes('insert into nuvex_storage') && sql.includes('on conflict')) {
+    if (
+      sql.includes('insert into nuvex_storage') &&
+      sql.includes('on conflict')
+    ) {
       if (params && params.length >= 2) {
         const [key, value, expiresAt] = params;
         const table = this.tables.get('nuvex_storage') || new Map();
-        
+
         // Handle ON CONFLICT DO UPDATE (used by atomic increment)
         if (sql.includes('do update')) {
           const existingRecord = table.get(key);
           let newValue: number;
-          
+
           if (existingRecord) {
             // Check if record has expired
             if (existingRecord.expires_at) {
@@ -74,9 +80,10 @@ export class MockPgClient {
                 // Not expired: add delta to existing value
                 let currentValue = 0;
                 try {
-                  const parsed = typeof existingRecord.value === 'string' 
-                    ? JSON.parse(existingRecord.value)
-                    : existingRecord.value;
+                  const parsed =
+                    typeof existingRecord.value === 'string'
+                      ? JSON.parse(existingRecord.value)
+                      : existingRecord.value;
                   currentValue = typeof parsed === 'number' ? parsed : 0;
                 } catch {
                   currentValue = 0;
@@ -87,9 +94,10 @@ export class MockPgClient {
               // No expiration: add delta to existing value
               let currentValue = 0;
               try {
-                const parsed = typeof existingRecord.value === 'string' 
-                  ? JSON.parse(existingRecord.value)
-                  : existingRecord.value;
+                const parsed =
+                  typeof existingRecord.value === 'string'
+                    ? JSON.parse(existingRecord.value)
+                    : existingRecord.value;
                 currentValue = typeof parsed === 'number' ? parsed : 0;
               } catch {
                 currentValue = 0;
@@ -100,20 +108,24 @@ export class MockPgClient {
             // Key doesn't exist: use delta as initial value
             newValue = Number(value);
           }
-          
+
           const record = {
             key,
             value: JSON.stringify(newValue),
             expires_at: expiresAt,
             created_at: existingRecord?.created_at || new Date(),
-            updated_at: new Date()
+            updated_at: new Date(),
           };
-          
+
           table.set(key, record);
           this.tables.set('nuvex_storage', table);
-          return { rows: [{ value: newValue }], rowCount: 1, command: 'INSERT' };
+          return {
+            rows: [{ value: newValue }],
+            rowCount: 1,
+            command: 'INSERT',
+          };
         }
-        
+
         // Handle ON CONFLICT DO NOTHING (legacy pattern)
         if (sql.includes('do nothing')) {
           // Only insert if key doesn't exist
@@ -123,60 +135,99 @@ export class MockPgClient {
               value: typeof value === 'number' ? JSON.stringify(value) : value,
               expires_at: expiresAt,
               created_at: new Date(),
-              updated_at: new Date()
+              updated_at: new Date(),
             };
-            
+
             table.set(key, record);
             this.tables.set('nuvex_storage', table);
             return { rows: [record], rowCount: 1, command: 'INSERT' };
           }
           return { rows: [], rowCount: 0, command: 'INSERT' };
         }
-        
+
         // Handle atomic increment operations (legacy pattern)
         if (sql.includes('coalesce(cast(nuvex_storage.value as numeric)')) {
           const existingRecord = table.get(key);
-          const currentValue = existingRecord ? Number(existingRecord.value) || 0 : 0;
+          const currentValue = existingRecord
+            ? Number(existingRecord.value) || 0
+            : 0;
           const delta = Number(value);
           const newValue = currentValue + delta;
-          
+
           const record = {
             key,
             value: newValue.toString(),
             expires_at: expiresAt,
             created_at: new Date(),
-            updated_at: new Date()
+            updated_at: new Date(),
           };
-          
+
           table.set(key, record);
           this.tables.set('nuvex_storage', table);
-          return { rows: [{ numeric_value: newValue }], rowCount: 1, command: 'INSERT' };
+          return {
+            rows: [{ numeric_value: newValue }],
+            rowCount: 1,
+            command: 'INSERT',
+          };
         }
-        
+
         // Regular upsert operation
         const record = {
           key,
           value,
           expires_at: expiresAt,
           created_at: new Date(),
-          updated_at: new Date()
+          updated_at: new Date(),
         };
-        
+
         table.set(key, record);
         this.tables.set('nuvex_storage', table);
         return { rows: [record], rowCount: 1, command: 'INSERT' };
       }
       return { rows: [], rowCount: 0, command: 'INSERT' };
     }
-    
+
     // Handle SELECT from nuvex_storage with expiration check
-    if (sql.includes('select value from nuvex_storage')) {
+    if (normalizedSql.includes('select expires_at from nuvex_storage')) {
       const table = this.tables.get('nuvex_storage') || new Map();
-      
+
       if (params && params.length > 0) {
         const key = params[0];
         const record = table.get(key);
-        
+        return {
+          rows: record ? [{ expires_at: record.expires_at ?? null }] : [],
+          rowCount: record ? 1 : 0,
+          command: 'SELECT',
+        };
+      }
+
+      return { rows: [], rowCount: 0, command: 'SELECT' };
+    }
+
+    if (normalizedSql.includes('select nuvex_key as key from nuvex_storage')) {
+      const table = this.tables.get('nuvex_storage') || new Map();
+      const rows = Array.from(table.values())
+        .filter((record) => {
+          if (!record.expires_at) {
+            return true;
+          }
+          return new Date(record.expires_at).getTime() > Date.now();
+        })
+        .map((record) => ({ key: record.key }));
+
+      return { rows, rowCount: rows.length, command: 'SELECT' };
+    }
+
+    if (
+      normalizedSql.includes('select') &&
+      normalizedSql.includes('from nuvex_storage')
+    ) {
+      const table = this.tables.get('nuvex_storage') || new Map();
+
+      if (params && params.length > 0) {
+        const key = params[0];
+        const record = table.get(key);
+
         if (record) {
           // Check if record has expired (compare in UTC)
           if (record.expires_at) {
@@ -187,51 +238,63 @@ export class MockPgClient {
               return { rows: [], rowCount: 0, command: 'SELECT' };
             }
           }
-          return { rows: [{ value: record.value }], rowCount: 1, command: 'SELECT' };
+          return {
+            rows: [
+              {
+                value: record.value,
+                nuvex_data: record.value,
+                key: record.key,
+                nuvex_key: record.key,
+                expires_at: record.expires_at ?? null,
+              },
+            ],
+            rowCount: 1,
+            command: 'SELECT',
+          };
         }
       }
-      
+
       return { rows: [], rowCount: 0, command: 'SELECT' };
     }
-    
+
     // Handle DELETE from nuvex_storage
     if (sql.includes('delete from nuvex_storage')) {
       const table = this.tables.get('nuvex_storage') || new Map();
-      
+
       if (params && params.length > 0) {
         const key = params[0];
         const existed = table.has(key);
         table.delete(key);
         return { rows: [], rowCount: existed ? 1 : 0, command: 'DELETE' };
       }
-      
+
       return { rows: [], rowCount: 0, command: 'DELETE' };
     }
-    
+
     // Handle generic SELECT for other operations
     if (sql.includes('select')) {
       const tableMatch = sql.match(/from\s+(\w+)/);
       if (tableMatch) {
         const tableName = tableMatch[1];
         const table = this.tables.get(tableName) || new Map();
-        
+
         // Handle WHERE clause
         if (sql.includes('where') && params && params.length > 0) {
           const record = table.get(params[0]);
           return {
             rows: record ? [record] : [],
             rowCount: record ? 1 : 0,
-            command: 'SELECT'
+            command: 'SELECT',
           };
         }
-        
+
         // Return all records
         const rows = Array.from(table.values());
         return { rows, rowCount: rows.length, command: 'SELECT' };
       }
       return { rows: [], rowCount: 0, command: 'SELECT' };
     }
-    
+
     // Default response
     return { rows: [], rowCount: 0, command: 'UNKNOWN' };
   }

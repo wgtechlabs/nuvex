@@ -94,14 +94,17 @@ This project enforces the **[Clean Commit](https://github.com/wgtechlabs/clean-c
 ### Linting
 
 ```bash
-# Run linter
+# Run Biome checks
 bun run lint
 
 # Auto-fix lint issues
 bun run lint:fix
 
-# Run security linter
-bun run lint:security
+# Check formatting
+bun run format:check
+
+# Write formatting changes
+bun run format
 ```
 
 ### Testing

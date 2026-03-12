@@ -1,9 +1,9 @@
 /**
  * Nuvex - Core Module Exports
  * Next-gen Unified Vault Experience
- * 
+ *
  * Clean exports for all core components
- * 
+ *
  * @author Waren Gonzaga, WG Technology Labs
  * @since 2025
  */

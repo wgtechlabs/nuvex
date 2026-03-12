@@ -1,12 +1,12 @@
 /**
  * Test Configuration Utility
- * 
+ *
  * This module implements a zero-hardcoded-credentials test environment that follows
  * Snyk Code best practices and industry security standards.
- * 
+ *
  * Strategy:
  * 1. All credentials come from environment variables (NUVEX_TEST_*)
- * 2. Dynamic generation for missing credentials  
+ * 2. Dynamic generation for missing credentials
  * 3. Isolated test sessions
  * 4. Zero static strings that could be flagged
  */
@@ -21,20 +21,20 @@ import crypto from 'crypto';
 const ENV_VARS = {
   // PostgreSQL
   PG_HOST: 'NUVEX_TEST_POSTGRES_HOST',
-  PG_PORT: 'NUVEX_TEST_POSTGRES_PORT', 
+  PG_PORT: 'NUVEX_TEST_POSTGRES_PORT',
   PG_DATABASE: 'NUVEX_TEST_POSTGRES_DATABASE',
   PG_USER: 'NUVEX_TEST_POSTGRES_USER',
   PG_PASSWORD: 'NUVEX_TEST_POSTGRES_PASSWORD',
-  
+
   // Redis
   REDIS_URL: 'NUVEX_TEST_REDIS_URL',
   REDIS_HOST: 'NUVEX_TEST_REDIS_HOST',
   REDIS_PORT: 'NUVEX_TEST_REDIS_PORT',
-  
+
   // Memory
   MEM_TTL: 'NUVEX_TEST_MEMORY_TTL',
   MEM_SIZE: 'NUVEX_TEST_MEMORY_MAX_SIZE',
-  MEM_CLEANUP: 'NUVEX_TEST_MEMORY_CLEANUP_INTERVAL'
+  MEM_CLEANUP: 'NUVEX_TEST_MEMORY_CLEANUP_INTERVAL',
 } as const;
 
 /**
@@ -53,7 +53,8 @@ class SecureTestCredentialGenerator {
 
   static getInstance(): SecureTestCredentialGenerator {
     if (!SecureTestCredentialGenerator.instance) {
-      SecureTestCredentialGenerator.instance = new SecureTestCredentialGenerator();
+      SecureTestCredentialGenerator.instance =
+        new SecureTestCredentialGenerator();
     }
     return SecureTestCredentialGenerator.instance;
   }
@@ -103,7 +104,10 @@ class EnvironmentConfigReader {
   /**
    * Get configuration value from environment or generate secure default
    */
-  private getEnvOrDefault(envKey: string, defaultGenerator: () => string): string {
+  private getEnvOrDefault(
+    envKey: string,
+    defaultGenerator: () => string,
+  ): string {
     return process.env[envKey] || defaultGenerator();
   }
 
@@ -113,10 +117,19 @@ class EnvironmentConfigReader {
   getPostgresConfig() {
     return {
       host: this.getEnvOrDefault(ENV_VARS.PG_HOST, () => 'localhost'),
-      port: parseInt(this.getEnvOrDefault(ENV_VARS.PG_PORT, () => '5432'), 10),
-      database: this.getEnvOrDefault(ENV_VARS.PG_DATABASE, () => this.generator.generateDatabaseName()),
-      user: this.getEnvOrDefault(ENV_VARS.PG_USER, () => this.generator.generateUsername()),
-      password: this.getEnvOrDefault(ENV_VARS.PG_PASSWORD, () => this.generator.generatePassword())
+      port: parseInt(
+        this.getEnvOrDefault(ENV_VARS.PG_PORT, () => '5432'),
+        10,
+      ),
+      database: this.getEnvOrDefault(ENV_VARS.PG_DATABASE, () =>
+        this.generator.generateDatabaseName(),
+      ),
+      user: this.getEnvOrDefault(ENV_VARS.PG_USER, () =>
+        this.generator.generateUsername(),
+      ),
+      password: this.getEnvOrDefault(ENV_VARS.PG_PASSWORD, () =>
+        this.generator.generatePassword(),
+      ),
     };
   }
 
@@ -125,8 +138,13 @@ class EnvironmentConfigReader {
    */
   getRedisConfig() {
     return {
-      url: this.getEnvOrDefault(ENV_VARS.REDIS_URL, () => this.generator.generateRedisUrl()),
-      ttl: parseInt(this.getEnvOrDefault(ENV_VARS.MEM_TTL, () => '3600000'), 10)
+      url: this.getEnvOrDefault(ENV_VARS.REDIS_URL, () =>
+        this.generator.generateRedisUrl(),
+      ),
+      ttl: parseInt(
+        this.getEnvOrDefault(ENV_VARS.MEM_TTL, () => '3600000'),
+        10,
+      ),
     };
   }
 
@@ -135,9 +153,18 @@ class EnvironmentConfigReader {
    */
   getMemoryConfig() {
     return {
-      ttl: parseInt(this.getEnvOrDefault(ENV_VARS.MEM_TTL, () => '3600000'), 10),
-      maxSize: parseInt(this.getEnvOrDefault(ENV_VARS.MEM_SIZE, () => '1000'), 10),
-      cleanupInterval: parseInt(this.getEnvOrDefault(ENV_VARS.MEM_CLEANUP, () => '60000'), 10)
+      ttl: parseInt(
+        this.getEnvOrDefault(ENV_VARS.MEM_TTL, () => '3600000'),
+        10,
+      ),
+      maxSize: parseInt(
+        this.getEnvOrDefault(ENV_VARS.MEM_SIZE, () => '1000'),
+        10,
+      ),
+      cleanupInterval: parseInt(
+        this.getEnvOrDefault(ENV_VARS.MEM_CLEANUP, () => '60000'),
+        10,
+      ),
     };
   }
 }
@@ -153,7 +180,7 @@ export function getTestConfig(): NuvexConfig {
   return {
     postgres: configReader.getPostgresConfig(),
     redis: configReader.getRedisConfig(),
-    memory: configReader.getMemoryConfig()
+    memory: configReader.getMemoryConfig(),
   };
 }
 
@@ -165,7 +192,7 @@ export function getTestPostgresConfig() {
 }
 
 /**
- * Get Redis test configuration  
+ * Get Redis test configuration
  */
 export function getTestRedisConfig() {
   return configReader.getRedisConfig();
@@ -174,21 +201,24 @@ export function getTestRedisConfig() {
 /**
  * Validate test environment
  */
-export function validateTestEnvironment(): { isValid: boolean; usingDefaults: string[] } {
+export function validateTestEnvironment(): {
+  isValid: boolean;
+  usingDefaults: string[];
+} {
   const usingDefaults: string[] = [];
-  
+
   Object.entries(ENV_VARS).forEach(([_key, envVar]) => {
     if (!process.env[envVar]) {
       usingDefaults.push(envVar);
     }
   });
-    if (usingDefaults.length > 0) {
+  if (usingDefaults.length > 0) {
     // Silently use secure generated defaults
   }
-  
+
   return {
     isValid: true,
-    usingDefaults
+    usingDefaults,
   };
 }
 

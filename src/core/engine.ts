@@ -1,16 +1,16 @@
 /**
  * Nuvex - Storage Engine
  * Next-gen Unified Vault Experience
- * 
+ *
  * Multi-layer storage architecture that provides intelligent caching and data
  * persistence for any Node.js application. Implements a three-tier storage system
  * optimized for performance, scalability, and reliability.
- * 
+ *
  * Storage Architecture:
  * - Layer 1: Memory Cache (configurable TTL) - Fastest access for hot data
  * - Layer 2: Redis Cache (configurable TTL) - Fast distributed cache for warm data
  * - Layer 3: PostgreSQL (Permanent) - Persistent storage for cold data
- * 
+ *
  * Key Features:
  * - Automatic data tier management and promotion/demotion
  * - Configurable TTL (Time To Live) for each storage layer
@@ -18,36 +18,43 @@
  * - Memory cleanup and garbage collection
  * - Connection pooling and error recovery
  * - Pluggable logging support
- * 
+ *
  * @author Waren Gonzaga, WG Technology Labs
  * @since 2025
  */
-import type { 
-  NuvexConfig, 
-  StorageOptions, 
+import type {
+  NuvexConfig,
+  StorageOptions,
   StorageMetrics,
-  StorageItem,
   BatchOperation,
   BatchResult,
   QueryOptions,
-  QueryResult
+  QueryResult,
 } from '../types/index.js';
 import { StorageLayer } from '../types/index.js';
-import type { Storage, Logger, StorageLayerInterface } from '../interfaces/index.js';
-import { MemoryStorage, RedisStorage, PostgresStorage } from '../layers/index.js';
+import type {
+  Storage,
+  Logger,
+  StorageLayerInterface,
+} from '../interfaces/index.js';
+import {
+  MemoryStorage,
+  RedisStorage,
+  PostgresStorage,
+} from '../layers/index.js';
 
 /**
  * # StorageEngine - Multi-layer Storage Architecture
- * 
+ *
  * The core storage engine that implements Nuvex's intelligent three-tier storage system.
  * Provides automatic data management, intelligent caching, and comprehensive fallback mechanisms
  * across Memory, Redis, and PostgreSQL layers.
- * 
+ *
  * ## Architecture Design
- * 
+ *
  * The StorageEngine follows a hierarchical approach where data flows through layers based on
  * access patterns and configured policies:
- * 
+ *
  * ```
  * ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
  * │   Memory    │───▶│    Redis    │───▶│ PostgreSQL  │
@@ -55,29 +62,29 @@ import { MemoryStorage, RedisStorage, PostgresStorage } from '../layers/index.js
  * │ < 1ms       │    │ 1-5ms       │    │ 5-50ms      │
  * └─────────────┘    └─────────────┘    └─────────────┘
  * ```
- * 
+ *
  * ## Key Features
- * 
+ *
  * ### Intelligent Data Management
  * - **Automatic Promotion**: Frequently accessed data moves to faster layers
  * - **Smart Demotion**: Unused data gracefully moves to persistent storage
  * - **TTL Management**: Configurable time-to-live for each layer
  * - **Memory Optimization**: LRU eviction and automatic cleanup
- * 
+ *
  * ### Performance Optimization
  * - **Sub-millisecond Access**: Memory cache for hot data
  * - **Batch Operations**: Efficient bulk data operations
  * - **Connection Pooling**: Optimized database connections
  * - **Metrics Collection**: Real-time performance monitoring
- * 
+ *
  * ### Reliability Features
  * - **Graceful Degradation**: Automatic fallback when layers are unavailable
  * - **Error Recovery**: Comprehensive error handling and logging
  * - **Data Consistency**: Synchronization across all storage layers
  * - **Health Monitoring**: Layer availability and performance tracking
- * 
+ *
  * ## Usage Examples
- * 
+ *
  * ### Basic Operations
  * ```typescript
  * const engine = new StorageEngine({
@@ -85,39 +92,39 @@ import { MemoryStorage, RedisStorage, PostgresStorage } from '../layers/index.js
  *   redis: { url: 'redis://localhost:6379' },
  *   postgres: { host: 'localhost', database: 'app' }
  * });
- * 
+ *
  * await engine.connect();
- * 
+ *
  * // Set data across all layers
  * await engine.set('user:123', userData);
- * 
+ *
  * // Get data (checks Memory → Redis → PostgreSQL)
  * const user = await engine.get('user:123');
  * ```
- * 
+ *
  * ### Layer-specific Operations
  * ```typescript
  * // Store only in Redis
- * await engine.set('session:abc', sessionData, { 
- *   layer: StorageLayer.REDIS 
+ * await engine.set('session:abc', sessionData, {
+ *   layer: StorageLayer.REDIS
  * });
- * 
+ *
  * // Skip cache and go directly to PostgreSQL
- * const criticalData = await engine.get('config:critical', { 
- *   skipCache: true 
+ * const criticalData = await engine.get('config:critical', {
+ *   skipCache: true
  * });
  * ```
- * 
+ *
  * ### Batch Operations
  * ```typescript
  * const operations = [
  *   { operation: 'set', key: 'key1', value: 'value1' },
  *   { operation: 'set', key: 'key2', value: 'value2' }
  * ];
- * 
+ *
  * const results = await engine.setBatch(operations);
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // Initialize with full configuration
@@ -142,18 +149,18 @@ import { MemoryStorage, RedisStorage, PostgresStorage } from '../layers/index.js
  *     logger: console
  *   }
  * });
- * 
+ *
  * await engine.connect();
- * 
+ *
  * // Your storage operations here...
- * 
+ *
  * await engine.disconnect();
  * ```
- * 
+ *
  * @see {@link NuvexClient} for high-level client operations
  * @see {@link NuvexConfig} for configuration options
  * @see {@link StorageOptions} for operation-specific options
- * 
+ *
  * @public
  * @category Core
  */
@@ -162,7 +169,7 @@ export class StorageEngine implements Storage {
   private l1Memory: MemoryStorage;
   private l2Redis: RedisStorage | null;
   private l3Postgres: PostgresStorage | null;
-  
+
   // Configuration and state
   private config: NuvexConfig;
   private connected: boolean;
@@ -172,12 +179,12 @@ export class StorageEngine implements Storage {
 
   /**
    * Creates a new StorageEngine instance with the specified configuration.
-   * 
+   *
    * The constructor initializes all three storage layers and sets up automatic
    * memory cleanup intervals. No connections are established until `connect()` is called.
-   * 
+   *
    * @param config - Complete configuration object for all storage layers
-   * 
+   *
    * @example
    * ```typescript
    * const engine = new StorageEngine({
@@ -187,7 +194,7 @@ export class StorageEngine implements Storage {
    *   logging: { enabled: true }
    * });
    * ```
-   * 
+   *
    * @throws {Error} When configuration is invalid
    * @since 1.0.0
    */
@@ -195,24 +202,26 @@ export class StorageEngine implements Storage {
     this.config = config;
     this.connected = false;
     this.cleanupInterval = null;
-    
+
     // Logging setup
-    this.logger = config.logging?.enabled ? (config.logging.logger || null) : null;
-    
+    this.logger = config.logging?.enabled
+      ? config.logging.logger || null
+      : null;
+
     // Layer 1: Memory storage with LRU eviction
     const maxMemorySize = config.memory?.maxSize || 10000; // 10k entries default
     this.l1Memory = new MemoryStorage(maxMemorySize, this.logger);
-    
+
     // Layer 2: Redis storage (optional)
-    this.l2Redis = config.redis?.url 
+    this.l2Redis = config.redis?.url
       ? new RedisStorage(config.redis.url, this.logger)
       : null;
-    
+
     // Layer 3: PostgreSQL storage
     this.l3Postgres = config.postgres
       ? new PostgresStorage(config.postgres, this.logger)
       : null;
-    
+
     // Metrics initialization
     this.metrics = {
       memoryHits: 0,
@@ -222,35 +231,39 @@ export class StorageEngine implements Storage {
       postgresHits: 0,
       postgresMisses: 0,
       totalOperations: 0,
-      averageResponseTime: 0
+      averageResponseTime: 0,
     };
-    
+
     // Start memory cleanup interval
     this.startMemoryCleanup();
   }
-  
-  private log(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>): void {
+
+  private log(
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    meta?: Record<string, unknown>,
+  ): void {
     if (this.logger) {
       this.logger[level](message, meta);
     }
   }
-  
+
   /**
    * Establishes connections to all configured storage layers.
-   * 
+   *
    * This method initializes connections to Redis and PostgreSQL (if configured)
    * and sets up the internal state for multi-layer operations. The memory layer
    * is always available and doesn't require connection setup.
-   * 
+   *
    * @throws {Error} When connection to any configured layer fails
-   * 
+   *
    * @example
    * ```typescript
    * const engine = new StorageEngine(config);
    * await engine.connect();
    * console.log('All storage layers connected');
    * ```
-   * 
+   *
    * @since 1.0.0
    * @public
    */
@@ -262,108 +275,121 @@ export class StorageEngine implements Storage {
           await this.l2Redis.connect();
           this.log('info', 'Redis L2 connected for Nuvex storage');
         } catch (error) {
-          this.log('warn', 'Redis L2 not available, using Memory + PostgreSQL only', {
-            error: error instanceof Error ? error.message : String(error)
-          });
+          this.log(
+            'warn',
+            'Redis L2 not available, using Memory + PostgreSQL only',
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
           this.l2Redis = null;
         }
       } else {
-        this.log('info', 'Redis L2 URL not provided, using Memory + PostgreSQL only');
+        this.log(
+          'info',
+          'Redis L2 URL not provided, using Memory + PostgreSQL only',
+        );
       }
-      
+
       // Connect to PostgreSQL (L3) - critical for data persistence
       if (this.l3Postgres) {
         await this.l3Postgres.connect();
         this.log('info', 'PostgreSQL L3 connected for Nuvex storage');
       }
-      
+
       this.connected = true;
-      this.log('info', 'Nuvex StorageEngine initialized with 3-layer architecture');
+      this.log(
+        'info',
+        'Nuvex StorageEngine initialized with 3-layer architecture',
+      );
     } catch (error) {
       const err = error as Error;
       this.log('error', 'Nuvex StorageEngine connection failed', {
         error: err.message,
-        stack: err.stack
+        stack: err.stack,
       });
       throw error;
     }
   }
-  
+
   async disconnect(): Promise<void> {
     // Disconnect from Redis (L2)
     if (this.l2Redis) {
       await this.l2Redis.disconnect();
     }
-    
+
     // Disconnect from PostgreSQL (L3)
     if (this.l3Postgres) {
       await this.l3Postgres.disconnect();
     }
-    
+
     // Stop memory cleanup interval
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
-    
+
     this.connected = false;
     this.log('info', 'Nuvex StorageEngine disconnected');
   }
-  
+
   isConnected(): boolean {
     return this.connected;
   }
-  
+
   /**
    * Retrieves a value from storage using the intelligent layer hierarchy.
-   * 
+   *
    * The get operation follows the multi-layer approach:
    * 1. **Memory Cache**: Checks in-memory storage first (fastest)
    * 2. **Redis Cache**: Falls back to Redis if not in memory
    * 3. **PostgreSQL**: Final fallback to persistent storage
-   * 
+   *
    * When data is found in a lower layer, it's automatically promoted to higher
    * layers for faster future access (intelligent caching).
-   * 
+   *
    * @template T - The expected type of the stored value
    * @param key - The storage key to retrieve
    * @param options - Optional configuration for the get operation
    * @returns Promise resolving to the stored value or null if not found
-   * 
+   *
    * @example
    * ```typescript
    * // Basic get operation
    * const userData = await engine.get<UserData>('user:123');
-   * 
+   *
    * // Get from specific layer only
-   * const sessionData = await engine.get('session:abc', { 
-   *   layer: StorageLayer.REDIS 
+   * const sessionData = await engine.get('session:abc', {
+   *   layer: StorageLayer.REDIS
    * });
-   * 
+   *
    * // Skip cache layers and get from PostgreSQL directly
-   * const criticalData = await engine.get('config:critical', { 
-   *   skipCache: true 
+   * const criticalData = await engine.get('config:critical', {
+   *   skipCache: true
    * });
    * ```
-   * 
+   *
    * @since 1.0.0
    * @public
    */
-  async get<T = unknown>(key: string, options: StorageOptions = {}): Promise<T | null> {
+  async get<T = unknown>(
+    key: string,
+    options: StorageOptions = {},
+  ): Promise<T | null> {
     const startTime = Date.now();
     this.metrics.totalOperations++;
-    
+
     try {
       // Default TTL configuration
       const defaultTTL = this.config.redis?.ttl || 3 * 24 * 60 * 60; // 3 days in seconds
-      
+
       // Skip cache if requested - go directly to L3
       if (options?.skipCache && this.l3Postgres) {
         const value = await this.l3Postgres.get(key);
         this.updateResponseTime(Date.now() - startTime);
         return value as T | null;
       }
-      
+
       // Specific layer requested
       if (options?.layer) {
         let value: unknown = null;
@@ -381,7 +407,7 @@ export class StorageEngine implements Storage {
         this.updateResponseTime(Date.now() - startTime);
         return value as T | null;
       }
-      
+
       // Layer 1: Check memory cache first (fastest)
       let data = await this.l1Memory.get(key);
       if (data !== null) {
@@ -390,7 +416,7 @@ export class StorageEngine implements Storage {
         return data as T;
       }
       this.metrics.memoryMisses++;
-      
+
       // Layer 2: Check Redis cache (fast distributed cache)
       if (this.l2Redis) {
         data = await this.l2Redis.get(key);
@@ -403,7 +429,7 @@ export class StorageEngine implements Storage {
         }
         this.metrics.redisMisses++;
       }
-      
+
       // Layer 3: Check PostgreSQL (persistent storage, source of truth)
       if (this.l3Postgres) {
         data = await this.l3Postgres.get(key);
@@ -412,14 +438,16 @@ export class StorageEngine implements Storage {
           // Warm both L1 and L2 caches for future access
           await Promise.allSettled([
             this.l1Memory.set(key, data, defaultTTL),
-            this.l2Redis ? this.l2Redis.set(key, data, defaultTTL) : Promise.resolve()
+            this.l2Redis
+              ? this.l2Redis.set(key, data, defaultTTL)
+              : Promise.resolve(),
           ]);
           this.updateResponseTime(Date.now() - startTime);
           return data as T;
         }
         this.metrics.postgresMisses++;
       }
-      
+
       this.updateResponseTime(Date.now() - startTime);
       return null;
     } catch (error) {
@@ -428,27 +456,27 @@ export class StorageEngine implements Storage {
         error: err.message,
         stack: err.stack,
         operation: 'get',
-        key
+        key,
       });
       this.updateResponseTime(Date.now() - startTime);
       return null;
     }
   }
-  
+
   /**
    * Set value in storage layers using L3-first write strategy
-   * 
+   *
    * **L3-First Write Strategy:**
    * 1. Write to PostgreSQL (L3) first as source of truth
    * 2. If L3 write succeeds, warm caches (L1, L2) using Promise.allSettled
    * 3. Cache failures don't break the operation (graceful degradation)
-   * 
+   *
    * **Error Handling:**
    * - Returns `false` if L3 (PostgreSQL) write fails - operation is aborted
    * - Returns `false` if engine is not connected
    * - Returns `true` if L3 write succeeds (cache failures are tolerated)
    * - For memory/Redis-only deployments (no L3), cache write success determines result
-   * 
+   *
    * **Usage Recommendations:**
    * ```typescript
    * // Always check the return value for critical data
@@ -458,27 +486,31 @@ export class StorageEngine implements Storage {
    *   console.error('Failed to persist user data');
    *   throw new Error('Storage operation failed');
    * }
-   * 
+   *
    * // For non-critical data, you may proceed regardless
    * await engine.set('cache:temp', tempData); // Fire and forget
    * ```
-   * 
+   *
    * @param key - The key to store
    * @param value - The value to store
    * @param options - Optional storage options (ttl, layer targeting)
    * @returns Promise resolving to true if operation succeeded, false otherwise
    */
-  async set<T = unknown>(key: string, value: T, options: StorageOptions = {}): Promise<boolean> {
+  async set<T = unknown>(
+    key: string,
+    value: T,
+    options: StorageOptions = {},
+  ): Promise<boolean> {
     if (!this.connected) {
       return false;
     }
-    
+
     const startTime = Date.now();
     this.metrics.totalOperations++;
-    
+
     try {
       const ttl = options?.ttl;
-      
+
       // Specific layer requested
       if (options?.layer) {
         switch (options.layer) {
@@ -500,7 +532,7 @@ export class StorageEngine implements Storage {
             return true;
         }
       }
-      
+
       // L3-First Write Strategy: Write to PostgreSQL first (source of truth)
       if (this.l3Postgres) {
         try {
@@ -512,19 +544,19 @@ export class StorageEngine implements Storage {
             stack: err.stack,
             operation: 'set',
             key,
-            layer: 'L3'
+            layer: 'L3',
           });
           this.updateResponseTime(Date.now() - startTime);
           return false; // L3 failure is critical - abort operation
         }
       }
-      
+
       // Best-effort cache warming - tolerate cache failures using Promise.allSettled
       await Promise.allSettled([
         this.l1Memory.set(key, value, ttl),
-        this.l2Redis ? this.l2Redis.set(key, value, ttl) : Promise.resolve()
+        this.l2Redis ? this.l2Redis.set(key, value, ttl) : Promise.resolve(),
       ]);
-      
+
       this.updateResponseTime(Date.now() - startTime);
       return true;
     } catch (error) {
@@ -533,20 +565,20 @@ export class StorageEngine implements Storage {
         error: err.message,
         stack: err.stack,
         operation: 'set',
-        key
+        key,
       });
       this.updateResponseTime(Date.now() - startTime);
       return false;
     }
   }
-  
+
   /**
    * Delete from all storage layers using resilient approach
-   * 
+   *
    * Uses Promise.allSettled to attempt deletion from all layers without
    * failing if individual layers are unavailable. This provides graceful
    * degradation - even if cache layers fail, the operation continues.
-   * 
+   *
    * @param key - The key to delete
    * @param options - Optional storage options (layer targeting)
    * @returns Promise resolving to true if operation completed
@@ -554,7 +586,7 @@ export class StorageEngine implements Storage {
   async delete(key: string, options: StorageOptions = {}): Promise<boolean> {
     const startTime = Date.now();
     this.metrics.totalOperations++;
-    
+
     try {
       // Specific layer requested
       if (options?.layer) {
@@ -577,15 +609,15 @@ export class StorageEngine implements Storage {
             return true;
         }
       }
-      
+
       // Delete from all layers using Promise.allSettled for resilience
       // Even if some layers fail, we continue with others
       await Promise.allSettled([
         this.l1Memory.delete(key),
         this.l2Redis ? this.l2Redis.delete(key) : Promise.resolve(),
-        this.l3Postgres ? this.l3Postgres.delete(key) : Promise.resolve()
+        this.l3Postgres ? this.l3Postgres.delete(key) : Promise.resolve(),
       ]);
-      
+
       this.updateResponseTime(Date.now() - startTime);
       return true;
     } catch (error) {
@@ -594,7 +626,7 @@ export class StorageEngine implements Storage {
         error: err.message,
         stack: err.stack,
         operation: 'delete',
-        key
+        key,
       });
       this.updateResponseTime(Date.now() - startTime);
       return false;
@@ -617,22 +649,22 @@ export class StorageEngine implements Storage {
             return this.l3Postgres ? await this.l3Postgres.exists(key) : false;
         }
       }
-      
+
       // Check L1 (Memory) first
       if (await this.l1Memory.exists(key)) {
         return true;
       }
-      
+
       // Check L2 (Redis)
-      if (this.l2Redis && await this.l2Redis.exists(key)) {
+      if (this.l2Redis && (await this.l2Redis.exists(key))) {
         return true;
       }
-      
+
       // Check L3 (PostgreSQL)
-      if (this.l3Postgres && await this.l3Postgres.exists(key)) {
+      if (this.l3Postgres && (await this.l3Postgres.exists(key))) {
         return true;
       }
-      
+
       return false;
     } catch (error) {
       const err = error as Error;
@@ -640,15 +672,15 @@ export class StorageEngine implements Storage {
         error: err.message,
         stack: err.stack,
         operation: 'exists',
-        key
+        key,
       });
       return false;
     }
   }
-  
+
   /**
    * Set expiration for a key
-   * 
+   *
    * Note: This is a simplified implementation that re-sets the value with new TTL.
    * For a more efficient implementation, layers would need an expire() method.
    */
@@ -659,7 +691,7 @@ export class StorageEngine implements Storage {
       if (value === null) {
         return false;
       }
-      
+
       // Re-set with new TTL
       return await this.set(key, value, { ttl });
     } catch (error) {
@@ -668,7 +700,7 @@ export class StorageEngine implements Storage {
         error: err.message,
         operation: 'expire',
         key,
-        ttl
+        ttl,
       });
       return false;
     }
@@ -676,39 +708,39 @@ export class StorageEngine implements Storage {
 
   /**
    * Atomically increment a numeric value
-   * 
+   *
    * This method uses layer-specific atomic operations when available,
    * providing thread-safe increments across all storage layers.
-   * 
+   *
    * **Important:** The key must contain a numeric value (or not exist).
    * If the key contains a non-numeric value, the operation will fail:
    * - Redis: Throws error "value is not an integer"
    * - PostgreSQL: Throws error during numeric cast
    * - Memory: Treats non-numeric values as 0
-   * 
+   *
    * The increment cascades through layers:
    * 1. If L3 (PostgreSQL) is available, use its atomic UPSERT
    * 2. Else if L2 (Redis) is available, use INCRBY
    * 3. Else use L1 (Memory) increment
-   * 
+   *
    * After incrementing in the authoritative layer, the new value is
    * propagated to higher layers for cache consistency.
-   * 
+   *
    * @param key - The key to increment (must contain numeric value or not exist)
    * @param delta - The amount to increment by (default: 1)
    * @param ttl - Optional TTL in milliseconds
    * @returns Promise resolving to the new value after increment
    * @throws {Error} If the key contains a non-numeric value (Redis/PostgreSQL)
    * @throws {Error} If no storage layer is available
-   * 
+   *
    * @example
    * ```typescript
    * // Increment counter by 1
    * const newValue = await engine.increment('page_views');
-   * 
+   *
    * // Increment with custom delta
    * const credits = await engine.increment('user:credits', 10);
-   * 
+   *
    * // Decrement (negative delta)
    * const remaining = await engine.increment('inventory', -1);
    * ```
@@ -723,7 +755,7 @@ export class StorageEngine implements Storage {
       if (this.l3Postgres?.increment) {
         newValue = await this.l3Postgres.increment(key, delta, ttlSeconds);
         this.metrics.totalOperations++;
-        
+
         // Propagate to upper layers for cache consistency
         if (this.l2Redis) {
           await this.l2Redis.set(key, newValue, ttlSeconds);
@@ -734,7 +766,7 @@ export class StorageEngine implements Storage {
       } else if (this.l2Redis?.increment) {
         newValue = await this.l2Redis.increment(key, delta, ttlSeconds);
         this.metrics.totalOperations++;
-        
+
         // Propagate to memory layer
         if (this.l1Memory) {
           await this.l1Memory.set(key, newValue, ttlSeconds);
@@ -753,7 +785,7 @@ export class StorageEngine implements Storage {
         delta,
         newValue,
         duration,
-        success: true
+        success: true,
       });
 
       return newValue;
@@ -766,12 +798,12 @@ export class StorageEngine implements Storage {
         key,
         delta,
         duration,
-        success: false
+        success: false,
       });
       throw error;
     }
   }
-  
+
   // Batch operations
   async setBatch(operations: BatchOperation[]): Promise<BatchResult[]> {
     const settled = await Promise.allSettled(
@@ -781,33 +813,44 @@ export class StorageEngine implements Storage {
           return { key: op.key, success };
         }
         return { key: op.key, success: false, error: 'Invalid operation' };
-      })
+      }),
     );
-    
+
     return settled.map((result, index) =>
       result.status === 'fulfilled'
         ? result.value
-        : { key: operations[index].key, success: false, error: (result.reason as Error).message }
+        : {
+            key: operations[index].key,
+            success: false,
+            error: (result.reason as Error).message,
+          },
     );
   }
-  
-  async getBatch(keys: string[], options: StorageOptions = {}): Promise<BatchResult[]> {
+
+  async getBatch(
+    keys: string[],
+    options: StorageOptions = {},
+  ): Promise<BatchResult[]> {
     const settled = await Promise.allSettled(
       keys.map(async (key): Promise<BatchResult> => {
         const value = await this.get(key, options);
         return value !== null
           ? { key, success: true, value }
           : { key, success: false, value: null };
-      })
+      }),
     );
-    
+
     return settled.map((result, index) =>
       result.status === 'fulfilled'
         ? result.value
-        : { key: keys[index], success: false, error: (result.reason as Error).message }
+        : {
+            key: keys[index],
+            success: false,
+            error: (result.reason as Error).message,
+          },
     );
   }
-  
+
   async deleteBatch(keys: string[]): Promise<BatchResult[]> {
     const settled = await Promise.allSettled(
       keys.map(async (key): Promise<BatchResult> => {
@@ -817,62 +860,67 @@ export class StorageEngine implements Storage {
           return { key, success };
         }
         return { key, success: false };
-      })
+      }),
     );
-    
+
     return settled.map((result, index) =>
       result.status === 'fulfilled'
         ? result.value
-        : { key: keys[index], success: false, error: (result.reason as Error).message }
+        : {
+            key: keys[index],
+            success: false,
+            error: (result.reason as Error).message,
+          },
     );
   }
-  
+
   // Query operations
   async query<T = unknown>(options: QueryOptions): Promise<QueryResult<T>> {
     // This is a basic implementation - can be enhanced based on needs
     const keys = await this.keys(options.pattern);
-    const items: Array<{ key: string; value: T; metadata: StorageItem<T> }> = [];
-    
+    const items: QueryResult<T>['items'] = [];
+
     for (const key of keys) {
       const value = await this.get<T>(key);
-      if (value !== null) {        items.push({
+      if (value !== null) {
+        const layerInfo = await this.getLayerInfo(key);
+        items.push({
           key,
           value,
-          metadata: {
-            value,
-            createdAt: new Date(), // This would need to be tracked
-            layer: (await this.getLayerInfo(key))?.layer as StorageLayer || StorageLayer.MEMORY
-          }
+          ...(layerInfo
+            ? { metadata: { layer: layerInfo.layer as StorageLayer } }
+            : {}),
         });
       }
     }
-    
+
     // Apply sorting and pagination
     const sortedItems = this.applySorting(items, options);
     const paginatedItems = this.applyPagination(sortedItems, options);
-    
+
     return {
       items: paginatedItems,
       total: items.length,
-      hasMore: (options.offset || 0) + (options.limit || items.length) < items.length
+      hasMore:
+        (options.offset || 0) + (options.limit || items.length) < items.length,
     };
   }
-  
+
   /**
    * Get all keys matching a pattern across all storage layers
-   * 
+   *
    * Collects keys from all available layers (Memory, Redis, PostgreSQL) and
    * returns deduplicated results. Currently implemented for the Memory layer;
    * Redis and PostgreSQL layer support will be added in future versions.
-   * 
+   *
    * @param pattern - Glob pattern for key matching (default: '*' returns all keys)
    * @returns Promise resolving to array of unique matching keys
-   * 
+   *
    * @since 1.0.0
    */
   async keys(pattern = '*'): Promise<string[]> {
     const allKeys = new Set<string>();
-    
+
     // Collect keys from Memory (L1) - always available
     if (this.l1Memory.keys) {
       try {
@@ -882,11 +930,11 @@ export class StorageEngine implements Storage {
         }
       } catch (error) {
         this.log('warn', 'Error collecting keys from Memory L1', {
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
-    
+
     // Collect keys from Redis (L2) - if keys() is implemented
     const l2Layer = this.l2Redis as StorageLayerInterface | null;
     if (l2Layer?.keys) {
@@ -897,11 +945,11 @@ export class StorageEngine implements Storage {
         }
       } catch (error) {
         this.log('warn', 'Error collecting keys from Redis L2', {
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
-    
+
     // Collect keys from PostgreSQL (L3) - if keys() is implemented
     const l3Layer = this.l3Postgres as StorageLayerInterface | null;
     if (l3Layer?.keys) {
@@ -912,42 +960,42 @@ export class StorageEngine implements Storage {
         }
       } catch (error) {
         this.log('warn', 'Error collecting keys from PostgreSQL L3', {
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
-    
+
     return Array.from(allKeys);
   }
-  
+
   async clear(pattern = '*'): Promise<number> {
     let cleared = 0;
-    
+
     // For now, only support clearing all (pattern = '*')
     // Pattern-based clearing would require keys() implementation in each layer
     if (pattern === '*') {
       // Clear memory (L1)
       cleared = this.l1Memory.size();
       await this.l1Memory.clear();
-      
+
       // Clear Redis (L2) - best effort
       if (this.l2Redis) {
         try {
           await this.l2Redis.clear();
         } catch (error) {
-          this.log('warn', 'Error clearing Redis L2', { 
-            error: error instanceof Error ? error.message : String(error) 
+          this.log('warn', 'Error clearing Redis L2', {
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
-      
+
       // Clear PostgreSQL (L3) - best effort
       if (this.l3Postgres) {
         try {
           await this.l3Postgres.clear();
         } catch (error) {
-          this.log('warn', 'Error clearing PostgreSQL L3', { 
-            error: error instanceof Error ? error.message : String(error) 
+          this.log('warn', 'Error clearing PostgreSQL L3', {
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -959,47 +1007,52 @@ export class StorageEngine implements Storage {
         cleared++;
       }
     }
-    
+
     return cleared;
   }
-  
+
   // Metrics and monitoring
   /**
    * Get performance metrics for all layers or specific layer(s)
-   * 
+   *
    * Returns metrics about storage operations and performance. Can be filtered
    * to return metrics for specific layers only.
-   * 
+   *
    * **Metrics by Layer:**
    * - Memory: memoryHits, memoryMisses, memorySize, memoryMaxSize
    * - Redis: redisHits, redisMisses
    * - PostgreSQL: postgresHits, postgresMisses
    * - Overall: totalOperations, cacheHitRatio, averageResponseTime
-   * 
+   *
    * @param layers - Optional layer(s) to get metrics for. If not provided, returns all metrics.
    *                 Can be a single layer string, 'all', or array of layer strings.
    * @returns Object containing requested metrics
-   * 
+   *
    * @example
    * ```typescript
    * // Get all metrics
    * const metrics = engine.getMetrics();
    * // { memoryHits, memoryMisses, redisHits, redisMisses, postgresHits, ... }
-   * 
+   *
    * // Get specific layer metrics
    * const memoryMetrics = engine.getMetrics('memory');
    * // { memoryHits, memoryMisses, memorySize, memoryMaxSize }
-   * 
+   *
    * // Get multiple layer metrics
    * const cacheMetrics = engine.getMetrics(['memory', 'redis']);
    * // { memoryHits, memoryMisses, memorySize, memoryMaxSize, redisHits, redisMisses, totalOperations, averageResponseTime, cacheHitRatio }
    * ```
-   * 
+   *
    * @since 1.0.0
    * @public
    */
   getMetrics(
-    layers?: 'memory' | 'redis' | 'postgres' | 'all' | Array<'memory' | 'redis' | 'postgres'>
+    layers?:
+      | 'memory'
+      | 'redis'
+      | 'postgres'
+      | 'all'
+      | Array<'memory' | 'redis' | 'postgres'>,
   ): Record<string, number> {
     // If no layers specified or 'all' specified, return all metrics
     if (!layers || layers === 'all') {
@@ -1007,16 +1060,16 @@ export class StorageEngine implements Storage {
         ...this.metrics,
         memorySize: this.l1Memory.size(),
         memoryMaxSize: this.l1Memory.getMaxSize(),
-        cacheHitRatio: this.calculateCacheHitRatio()
+        cacheHitRatio: this.calculateCacheHitRatio(),
       };
     }
-    
+
     // Normalize layers to an array
     const layersToGet = typeof layers === 'string' ? [layers] : layers;
-    
+
     // Build filtered metrics object
     const filteredMetrics: Record<string, number> = {};
-    
+
     for (const layer of layersToGet) {
       switch (layer) {
         case 'memory':
@@ -1035,17 +1088,17 @@ export class StorageEngine implements Storage {
           break;
       }
     }
-    
+
     // Add overall metrics if multiple layers are requested
     if (layersToGet.length > 1) {
       filteredMetrics.totalOperations = this.metrics.totalOperations;
       filteredMetrics.averageResponseTime = this.metrics.averageResponseTime;
       filteredMetrics.cacheHitRatio = this.calculateCacheHitRatio(layersToGet);
     }
-    
+
     return filteredMetrics;
   }
-  
+
   resetMetrics(): void {
     this.metrics = {
       memoryHits: 0,
@@ -1055,54 +1108,58 @@ export class StorageEngine implements Storage {
       postgresHits: 0,
       postgresMisses: 0,
       totalOperations: 0,
-      averageResponseTime: 0
+      averageResponseTime: 0,
     };
   }
-  
+
   /**
    * Perform health check on all storage layers or specific layer(s)
-   * 
+   *
    * Uses Promise.allSettled to check all layers independently without
    * failing if one layer is down. Each layer's ping() method is called
    * to verify its operational status.
-   * 
+   *
    * **Layer Health Checks:**
    * - Memory (L1): Always healthy if app is running
    * - Redis (L2): PING command verification
    * - PostgreSQL (L3): Nuvex schema readiness verification
-   * 
+   *
    * @param layers - Optional layer(s) to check. If not provided, checks all layers.
    *                 Can be a single layer string or array of layer strings.
    * @returns Promise resolving to health status of requested layer(s)
-   * 
+   *
    * @example
    * ```typescript
    * // Check all layers
    * const health = await engine.healthCheck();
    * // { memory: true, redis: true, postgres: true }
-   * 
+   *
    * // Check specific layer
    * const redisHealth = await engine.healthCheck('redis');
    * // { redis: true }
-   * 
+   *
    * // Check multiple specific layers
    * const cacheHealth = await engine.healthCheck(['memory', 'redis']);
    * // { memory: true, redis: true }
-   * 
+   *
    * if (!health.redis) {
    *   console.warn('Redis layer is down, degraded performance expected');
    * }
    * ```
-   * 
+   *
    * @since 1.0.0
    * @public
    */
   async healthCheck(
-    layers?: 'memory' | 'redis' | 'postgres' | Array<'memory' | 'redis' | 'postgres'>
+    layers?:
+      | 'memory'
+      | 'redis'
+      | 'postgres'
+      | Array<'memory' | 'redis' | 'postgres'>,
   ): Promise<Record<string, boolean>> {
     // Normalize layers to an array
     let layersToCheck: Array<'memory' | 'redis' | 'postgres'>;
-    
+
     if (!layers) {
       // No layers specified - check all
       layersToCheck = ['memory', 'redis', 'postgres'];
@@ -1113,11 +1170,11 @@ export class StorageEngine implements Storage {
       // Array of layers specified
       layersToCheck = layers;
     }
-    
+
     // Build promises only for requested layers
     const promises: Array<Promise<boolean>> = [];
     const layerNames: string[] = [];
-    
+
     for (const layer of layersToCheck) {
       switch (layer) {
         case 'memory':
@@ -1125,35 +1182,42 @@ export class StorageEngine implements Storage {
           layerNames.push('memory');
           break;
         case 'redis':
-          promises.push(this.l2Redis ? this.l2Redis.ping() : Promise.resolve(false));
+          promises.push(
+            this.l2Redis ? this.l2Redis.ping() : Promise.resolve(false),
+          );
           layerNames.push('redis');
           break;
         case 'postgres':
-          promises.push(this.l3Postgres ? this.l3Postgres.isReady() : Promise.resolve(false));
+          promises.push(
+            this.l3Postgres
+              ? this.l3Postgres.isReady()
+              : Promise.resolve(false),
+          );
           layerNames.push('postgres');
           break;
       }
     }
-    
+
     const results = await Promise.allSettled(promises);
-    
+
     // Build result object with only requested layers
     const healthStatus: Record<string, boolean> = {};
-    
+
     for (let i = 0; i < layerNames.length; i++) {
       const result = results[i];
-      healthStatus[layerNames[i]] = result.status === 'fulfilled' && result.value === true;
+      healthStatus[layerNames[i]] =
+        result.status === 'fulfilled' && result.value === true;
     }
-    
+
     return healthStatus;
   }
-  
+
   // Layer management
   async promote(key: string, targetLayer: string): Promise<boolean> {
     try {
       const value = await this.get(key);
       if (value === null) return false;
-      
+
       switch (targetLayer) {
         case StorageLayer.MEMORY:
           await this.l1Memory.set(key, value);
@@ -1174,13 +1238,13 @@ export class StorageEngine implements Storage {
           return false;
       }
     } catch (error) {
-      this.log('error', `Error promoting ${key} to ${targetLayer}`, { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', `Error promoting ${key} to ${targetLayer}`, {
+        error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
   }
-  
+
   async demote(key: string, targetLayer: string): Promise<boolean> {
     // For now, demote means remove from higher layers
     try {
@@ -1200,32 +1264,82 @@ export class StorageEngine implements Storage {
           return false;
       }
     } catch (error) {
-      this.log('error', `Error demoting ${key} to ${targetLayer}`, { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', `Error demoting ${key} to ${targetLayer}`, {
+        error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
   }
-  
-  async getLayerInfo(key: string): Promise<{ layer: string; ttl?: number } | null> {
+
+  async getLayerInfo(
+    key: string,
+  ): Promise<{ layer: string; ttl?: number } | null> {
     // Check which layer has the key (L1 → L2 → L3)
     if (await this.l1Memory.exists(key)) {
-      return { layer: StorageLayer.MEMORY };
+      const ttl = await this.l1Memory.getTtl?.(key);
+      return ttl !== null
+        ? { layer: StorageLayer.MEMORY, ttl }
+        : { layer: StorageLayer.MEMORY };
     }
-    
-    if (this.l2Redis && await this.l2Redis.exists(key)) {
-      return { layer: StorageLayer.REDIS };
+
+    if (this.l2Redis && (await this.l2Redis.exists(key))) {
+      const ttl = await this.l2Redis.getTtl?.(key);
+      return ttl !== null
+        ? { layer: StorageLayer.REDIS, ttl }
+        : { layer: StorageLayer.REDIS };
     }
-    
-    if (this.l3Postgres && await this.l3Postgres.exists(key)) {
-      return { layer: StorageLayer.POSTGRES };
+
+    if (this.l3Postgres && (await this.l3Postgres.exists(key))) {
+      const ttl = await this.l3Postgres.getTtl?.(key);
+      return ttl !== null
+        ? { layer: StorageLayer.POSTGRES, ttl }
+        : { layer: StorageLayer.POSTGRES };
     }
-    
+
     return null;
   }
-  
+
+  async getBackupSnapshotEntry<T = unknown>(
+    key: string,
+  ): Promise<{
+    layer: StorageLayer;
+    value: T;
+    expiresAt?: string;
+  } | null> {
+    const sources: Array<{
+      layer: StorageLayer;
+      storage: StorageLayerInterface | null;
+    }> = [
+      { layer: StorageLayer.POSTGRES, storage: this.l3Postgres },
+      { layer: StorageLayer.REDIS, storage: this.l2Redis },
+      { layer: StorageLayer.MEMORY, storage: this.l1Memory },
+    ];
+
+    for (const source of sources) {
+      if (!source.storage) {
+        continue;
+      }
+
+      const value = await source.storage.get(key);
+      if (value === null) {
+        continue;
+      }
+
+      const ttl = await source.storage.getTtl?.(key);
+      return {
+        layer: source.layer,
+        value: value as T,
+        ...(ttl && ttl > 0
+          ? { expiresAt: new Date(Date.now() + ttl * 1000).toISOString() }
+          : {}),
+      };
+    }
+
+    return null;
+  }
+
   // Private helper methods
-  
+
   // Memory cleanup
   private startMemoryCleanup(): void {
     const memoryTTL = this.config.memory?.ttl || 24 * 60 * 60 * 1000; // 24 hours default
@@ -1234,16 +1348,19 @@ export class StorageEngine implements Storage {
       try {
         const cleaned = await this.l1Memory.cleanup();
         if (cleaned > 0) {
-          this.log('debug', `Memory L1 cleanup completed - removed ${cleaned} expired entries`);
+          this.log(
+            'debug',
+            `Memory L1 cleanup completed - removed ${cleaned} expired entries`,
+          );
         }
       } catch (error) {
-        this.log('error', 'Memory cleanup error', { 
-          error: error instanceof Error ? error.message : String(error) 
+        this.log('error', 'Memory cleanup error', {
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }, cleanupInterval);
   }
-  
+
   // Utility methods
   private updateResponseTime(duration: number): void {
     // Exponential moving average with smoothing factor alpha
@@ -1251,15 +1368,23 @@ export class StorageEngine implements Storage {
     this.metrics.averageResponseTime =
       alpha * duration + (1 - alpha) * this.metrics.averageResponseTime;
   }
-  
-  private calculateCacheHitRatio(layers?: Array<'memory' | 'redis' | 'postgres'>): number {
+
+  private calculateCacheHitRatio(
+    layers?: Array<'memory' | 'redis' | 'postgres'>,
+  ): number {
     let totalHits = 0;
     let totalMisses = 0;
-    
+
     // If no layers specified, calculate for all layers
     if (!layers) {
-      totalHits = this.metrics.memoryHits + this.metrics.redisHits + this.metrics.postgresHits;
-      totalMisses = this.metrics.memoryMisses + this.metrics.redisMisses + this.metrics.postgresMisses;
+      totalHits =
+        this.metrics.memoryHits +
+        this.metrics.redisHits +
+        this.metrics.postgresHits;
+      totalMisses =
+        this.metrics.memoryMisses +
+        this.metrics.redisMisses +
+        this.metrics.postgresMisses;
     } else {
       // Calculate only for specified layers
       for (const layer of layers) {
@@ -1279,45 +1404,41 @@ export class StorageEngine implements Storage {
         }
       }
     }
-    
-    return totalHits + totalMisses > 0 ? totalHits / (totalHits + totalMisses) : 0;
+
+    return totalHits + totalMisses > 0
+      ? totalHits / (totalHits + totalMisses)
+      : 0;
   }
-  
-  private applySorting<T>(items: Array<{ key: string; value: T; metadata: StorageItem<T> }>, options: QueryOptions) {
-    if (!options.sortBy) return items;
-    
+
+  private applySorting<T>(
+    items: QueryResult<T>['items'],
+    options: QueryOptions,
+  ) {
+    if (!options.sortBy || options.sortBy !== 'key') return items;
+
     return items.sort((a, b) => {
-      let aVal, bVal;
-      
-      switch (options.sortBy) {
-        case 'key':
-          aVal = a.key;
-          bVal = b.key;
-          break;
-        case 'createdAt':
-          aVal = a.metadata.createdAt;
-          bVal = b.metadata.createdAt;
-          break;
-        default:
-          return 0;
-      }
-      
+      const aVal = a.key;
+      const bVal = b.key;
+
       const order = options.sortOrder === 'desc' ? -1 : 1;
       return aVal < bVal ? -order : aVal > bVal ? order : 0;
     });
   }
-  
-  private applyPagination<T>(items: Array<{ key: string; value: T; metadata: StorageItem<T> }>, options: QueryOptions) {
+
+  private applyPagination<T>(
+    items: QueryResult<T>['items'],
+    options: QueryOptions,
+  ) {
     const offset = options.offset || 0;
     const limit = options.limit;
-    
+
     if (limit) {
       return items.slice(offset, offset + limit);
     }
-    
+
     return items.slice(offset);
   }
-  
+
   // Legacy compatibility methods (for migration)
   getStats() {
     return {
@@ -1326,11 +1447,11 @@ export class StorageEngine implements Storage {
       layers: {
         memory: true,
         redis: this.l2Redis ? this.l2Redis.isConnected() : false,
-        postgres: this.l3Postgres ? this.l3Postgres.isConnected() : false
-      }
+        postgres: this.l3Postgres ? this.l3Postgres.isConnected() : false,
+      },
     };
   }
-  
+
   async cleanupExpiredMemory(): Promise<number> {
     return await this.l1Memory.cleanup();
   }

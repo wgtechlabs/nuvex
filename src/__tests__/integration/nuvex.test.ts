@@ -1,10 +1,10 @@
 /**
  * Integration Tests
  * End-to-end tests that demonstrate the full SDK functionality
- * 
+ *
  * IMPORTANT: This file uses secure environment-based test configuration.
  * Zero hardcoded credentials - all config generated dynamically.
- * 
+ *
  * @fileoverview Integration tests with zero hardcoded credentials
  */
 
@@ -27,7 +27,8 @@ describe('Nuvex SDK Integration Tests', () => {
   });
   describe('Multi-layer Storage Workflow', () => {
     // TODO: Update this test - keys() method needs to be reimplemented
-    test.skip('should demonstrate complete storage lifecycle', async () => {      // 1. Store user data
+    test.skip('should demonstrate complete storage lifecycle', async () => {
+      // 1. Store user data
       interface UserData {
         id: string;
         name: string;
@@ -36,24 +37,24 @@ describe('Nuvex SDK Integration Tests', () => {
           theme: string;
           notifications: boolean;
         };
-      }      // Generate dynamic test identifiers
+      } // Generate dynamic test identifiers
       const testUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const testUserKey = `user:${testUserId.split('_')[1]}`;
       const testEmail = `test_${Date.now()}@example.com`;
-      
+
       const userData: UserData = {
         id: testUserId,
         name: 'John Doe',
         email: testEmail,
         preferences: {
           theme: 'dark',
-          notifications: true
-        }
+          notifications: true,
+        },
       };
 
       // Store in all layers (default behavior)
       const stored = await client.set(testUserKey, userData);
-      expect(stored).toBe(true);      // 2. Retrieve data (should come from memory first)
+      expect(stored).toBe(true); // 2. Retrieve data (should come from memory first)
       const retrieved = await client.get<UserData>(testUserKey);
       expect(retrieved).toEqual(userData);
 
@@ -73,22 +74,34 @@ describe('Nuvex SDK Integration Tests', () => {
       const sessionData = {
         userId: userData.id,
         token: sessionToken,
-        expiresAt: new Date(Date.now() + 3600000) // 1 hour
+        expiresAt: new Date(Date.now() + 3600000), // 1 hour
       };
 
-      await client.set(`session:${sessionToken}`, sessionData, { ttl: 3600 });      // 6. Batch operations with dynamic values
+      await client.set(`session:${sessionToken}`, sessionData, { ttl: 3600 }); // 6. Batch operations with dynamic values
       const dynamicValue1 = `data_${Date.now()}_1`;
       const dynamicValue2 = `data_${Date.now()}_2`;
       const dynamicValue3 = `data_${Date.now()}_3`;
-      
+
       const batchData = [
-        { operation: 'set' as const, key: 'cache:1', value: { data: dynamicValue1 } },
-        { operation: 'set' as const, key: 'cache:2', value: { data: dynamicValue2 } },
-        { operation: 'set' as const, key: 'cache:3', value: { data: dynamicValue3 } }
+        {
+          operation: 'set' as const,
+          key: 'cache:1',
+          value: { data: dynamicValue1 },
+        },
+        {
+          operation: 'set' as const,
+          key: 'cache:2',
+          value: { data: dynamicValue2 },
+        },
+        {
+          operation: 'set' as const,
+          key: 'cache:3',
+          value: { data: dynamicValue3 },
+        },
       ];
 
       const batchResults = await client.setBatch(batchData);
-      expect(batchResults.every(r => r.success)).toBe(true);
+      expect(batchResults.every((r) => r.success)).toBe(true);
 
       // 7. Query operations
       const cacheKeys = await client.keys('cache:*');
@@ -114,12 +127,20 @@ describe('Nuvex SDK Integration Tests', () => {
       // Store in specific layers
       await client.set('memory:test', testData, { layer: StorageLayer.MEMORY });
       await client.set('redis:test', testData, { layer: StorageLayer.REDIS });
-      await client.set('postgres:test', testData, { layer: StorageLayer.POSTGRES });
+      await client.set('postgres:test', testData, {
+        layer: StorageLayer.POSTGRES,
+      });
 
       // Retrieve from specific layers
-      const memoryData = await client.get('memory:test', { layer: StorageLayer.MEMORY });
-      const redisData = await client.get('redis:test', { layer: StorageLayer.REDIS });
-      const postgresData = await client.get('postgres:test', { layer: StorageLayer.POSTGRES });
+      const memoryData = await client.get('memory:test', {
+        layer: StorageLayer.MEMORY,
+      });
+      const redisData = await client.get('redis:test', {
+        layer: StorageLayer.REDIS,
+      });
+      const postgresData = await client.get('postgres:test', {
+        layer: StorageLayer.POSTGRES,
+      });
 
       expect(memoryData).toEqual(testData);
       expect(redisData).toEqual(testData);
@@ -135,7 +156,8 @@ describe('Nuvex SDK Integration Tests', () => {
 
       const retrieved = await client.get('test:error');
       expect(retrieved).toBeNull();
-    });    test('should demonstrate configuration updates', async () => {
+    });
+    test('should demonstrate configuration updates', async () => {
       const initialConfig = client.getConfig();
       // Use the actual TTL from our test configuration (3600000 ms)
       expect(initialConfig.memory?.ttl).toBe(3600000);
@@ -144,8 +166,8 @@ describe('Nuvex SDK Integration Tests', () => {
       await client.configure({
         memory: {
           ttl: 1800000, // 30 minutes
-          maxSize: 2000
-        }
+          maxSize: 2000,
+        },
       });
 
       const updatedConfig = client.getConfig();

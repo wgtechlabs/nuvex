@@ -1,9 +1,9 @@
 /**
  * Nuvex - Database Utilities
  * Next-gen Unified Vault Experience
- * 
+ *
  * Database schema setup and migration utilities for PostgreSQL storage layer.
- * 
+ *
  * @author Waren Gonzaga, WG Technology Labs
  * @since 2025
  */
@@ -16,32 +16,35 @@ import type { Logger } from '../interfaces/index.js';
 function createDefaultLogger(): Logger {
   return {
     debug: () => {},
-    info: (message: string, meta?: unknown) => console.log(message, ...(meta !== undefined ? [meta] : [])),
-    warn: (message: string, meta?: unknown) => console.warn(message, ...(meta !== undefined ? [meta] : [])),
-    error: (message: string, meta?: unknown) => console.error(message, ...(meta !== undefined ? [meta] : [])),
+    info: (message: string, meta?: unknown) =>
+      console.log(message, ...(meta !== undefined ? [meta] : [])),
+    warn: (message: string, meta?: unknown) =>
+      console.warn(message, ...(meta !== undefined ? [meta] : [])),
+    error: (message: string, meta?: unknown) =>
+      console.error(message, ...(meta !== undefined ? [meta] : [])),
   };
 }
 
 /**
  * Validate SQL identifier to prevent SQL injection
  * Ensures the identifier contains only alphanumeric characters and underscores
- * 
+ *
  * @param identifier - SQL identifier to validate
  * @param name - Name of the identifier for error messages
  * @throws {Error} If identifier contains invalid characters
- * 
+ *
  * @example
  * ```typescript
  * validateSQLIdentifier('my_table_123', 'table name'); // OK
  * validateSQLIdentifier('users; DROP TABLE', 'table name'); // throws Error
  * ```
- * 
+ *
  * @since 1.0.0
  */
 export function validateSQLIdentifier(identifier: string, name: string): void {
   if (!identifier || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
     throw new Error(
-      `Invalid ${name}: "${identifier}". SQL identifiers must start with a letter or underscore and contain only alphanumeric characters and underscores.`
+      `Invalid ${name}: "${identifier}". SQL identifiers must start with a letter or underscore and contain only alphanumeric characters and underscores.`,
     );
   }
 }
@@ -53,24 +56,24 @@ export interface SchemaGenerationOptions {
 
 /**
  * Generate SQL schema for Nuvex storage with configurable table and column names
- * 
+ *
  * @param schema - Optional schema configuration for custom table/column names
  * @returns SQL string for creating the schema
  * @throws {Error} If table or column names contain invalid characters
  */
 export function generateNuvexSchemaSQL(
   schema?: PostgresSchemaConfig,
-  options: SchemaGenerationOptions = {}
+  options: SchemaGenerationOptions = {},
 ): string {
   const tableName = schema?.tableName ?? 'nuvex_storage';
   const keyColumn = schema?.columns?.key ?? 'nuvex_key';
   const valueColumn = schema?.columns?.value ?? 'nuvex_data';
-  
+
   // Validate all identifiers to prevent SQL injection
   validateSQLIdentifier(tableName, 'table name');
   validateSQLIdentifier(keyColumn, 'key column name');
   validateSQLIdentifier(valueColumn, 'value column name');
-  
+
   return `
 -- Nuvex storage table for PostgreSQL layer
 CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -86,14 +89,18 @@ CREATE TABLE IF NOT EXISTS ${tableName} (
 CREATE INDEX IF NOT EXISTS idx_${tableName}_expires_at 
 ON ${tableName}(expires_at) 
 WHERE expires_at IS NOT NULL;
-${options.enableTrigram ? `
+${
+  options.enableTrigram
+    ? `
 -- Ensure pg_trgm extension is available for GIN index
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Index for key pattern searches
 CREATE INDEX IF NOT EXISTS idx_${tableName}_key_pattern 
 ON ${tableName} USING gin(${keyColumn} gin_trgm_ops);
-` : ''}
+`
+    : ''
+}
 
 -- Function to auto-update updated_at
 CREATE OR REPLACE FUNCTION update_${tableName}_updated_at()
@@ -131,7 +138,7 @@ export const NUVEX_SCHEMA_SQL = generateNuvexSchemaSQL();
 
 export interface SchemaSetupOptions {
   /** Enable trigram extension for advanced pattern matching (requires pg_trgm) */
-  enableTrigram?: boolean; 
+  enableTrigram?: boolean;
   /** Set up periodic cleanup job using pg_cron extension */
   enableCleanupJob?: boolean;
   /** Schema configuration for custom table/column names */
@@ -140,11 +147,11 @@ export interface SchemaSetupOptions {
 
 /**
  * Setup Nuvex database schema
- * 
+ *
  * Creates the necessary PostgreSQL tables, indexes, functions, and triggers
  * required for the Nuvex storage system. This function is idempotent and
  * can be safely called multiple times.
- * 
+ *
  * Features created:
  * - `nuvex_storage` table with JSON support and TTL
  * - Indexes for performance optimization
@@ -152,52 +159,52 @@ export interface SchemaSetupOptions {
  * - Cleanup function for expired entries
  * - Optional trigram support for pattern matching
  * - Optional automated cleanup job scheduling
- * 
+ *
  * @param db - PostgreSQL connection pool
  * @param options - Optional configuration for schema setup
  * @returns Promise that resolves when schema is created
- * 
+ *
  * @example
  * ```typescript
  * import { Pool } from 'pg';
  * import { setupNuvexSchema } from './database';
- * 
+ *
  * const db = new Pool({ connectionString: 'postgresql://...' });
- * 
+ *
  * // Basic setup
  * await setupNuvexSchema(db);
- * 
+ *
  * // Advanced setup with all features
  * await setupNuvexSchema(db, {
  *   enableTrigram: true,    // Enable pattern matching
  *   enableCleanupJob: true  // Auto-cleanup expired entries
  * });
  * ```
- * 
+ *
  * @throws {Error} If database connection fails or schema creation fails
- * 
+ *
  * @since 1.0.0
  */
 export async function setupNuvexSchema(
-  db: PoolType, 
+  db: PoolType,
   options: SchemaSetupOptions = {},
-  logger?: Logger
+  logger?: Logger,
 ): Promise<void> {
   const log = logger ?? createDefaultLogger();
   try {
     // Generate schema SQL with custom table/column names if provided
     const schemaSQL = generateNuvexSchemaSQL(options.schema, {
-      enableTrigram: options.enableTrigram
+      enableTrigram: options.enableTrigram,
     });
-    
+
     // Execute main schema
     await db.query(schemaSQL);
-    
+
     // Setup periodic cleanup job if requested
     if (options.enableCleanupJob) {
       await setupCleanupJob(db, undefined, options.schema, logger);
     }
-    
+
     log.info('Nuvex database schema setup completed successfully');
   } catch (error) {
     log.error('Failed to setup Nuvex database schema:', error);
@@ -207,44 +214,54 @@ export async function setupNuvexSchema(
 
 /**
  * Setup periodic cleanup job (requires pg_cron extension)
- * 
+ *
  * Creates a scheduled job using PostgreSQL's pg_cron extension to automatically
  * clean up expired entries from the nuvex_storage table. The job runs daily at 2 AM.
- * 
+ *
  * @param db - PostgreSQL connection pool
  * @param tenantId - Optional tenant identifier for multi-tenant setups
  * @returns Promise that resolves when the cleanup job is scheduled
- * 
+ *
  * @example
  * ```typescript
  * // Setup cleanup job for main application
  * await setupCleanupJob(db);
- * 
+ *
  * // Setup cleanup job for specific tenant
  * await setupCleanupJob(db, 'tenant-123');
  * ```
- * 
+ *
  * @throws {Error} If pg_cron extension is not available or insufficient privileges
- * 
+ *
  * @requires pg_cron extension and superuser privileges
  * @since 1.0.0
  */
-async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: PostgresSchemaConfig, logger?: Logger): Promise<void> {
+async function setupCleanupJob(
+  db: PoolType,
+  tenantId?: string,
+  schema?: PostgresSchemaConfig,
+  logger?: Logger,
+): Promise<void> {
   const log = logger ?? createDefaultLogger();
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
     validateSQLIdentifier(tableName, 'table name');
-    
+
     // Generate a unique job name per tenant/context
-    const jobName = tenantId ? `nuvex-cleanup-${tenantId}` : `nuvex-cleanup-${Date.now()}`;
+    const jobName = tenantId
+      ? `nuvex-cleanup-${tenantId}`
+      : `nuvex-cleanup-${Date.now()}`;
     // This requires pg_cron extension and superuser privileges
-    await db.query(`
+    await db.query(
+      `
       SELECT cron.schedule(
         $1,
         '0 2 * * *', -- Daily at 2 AM
         'SELECT cleanup_expired_${tableName}();'
       );
-    `, [jobName]);
+    `,
+      [jobName],
+    );
     log.info(`Nuvex cleanup cron job scheduled as '${jobName}'`);
   } catch (error) {
     log.error('Failed to schedule Nuvex cleanup cron job:', error);
@@ -254,30 +271,36 @@ async function setupCleanupJob(db: PoolType, tenantId?: string, schema?: Postgre
 
 /**
  * Manually clean up expired entries
- * 
+ *
  * Executes the cleanup function to remove all expired entries from the
  * nuvex_storage table. This can be called manually or as part of a maintenance routine.
- * 
+ *
  * @param db - PostgreSQL connection pool
  * @returns Promise that resolves to the number of deleted entries
- * 
+ *
  * @example
  * ```typescript
  * const deletedCount = await cleanupExpiredEntries(db);
  * console.log(`Cleaned up ${deletedCount} expired entries`);
  * ```
- * 
+ *
  * @throws {Error} If the cleanup operation fails
- * 
+ *
  * @since 1.0.0
  */
-export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchemaConfig, logger?: Logger): Promise<number> {
+export async function cleanupExpiredEntries(
+  db: PoolType,
+  schema?: PostgresSchemaConfig,
+  logger?: Logger,
+): Promise<number> {
   const log = logger ?? createDefaultLogger();
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
     validateSQLIdentifier(tableName, 'table name');
-    
-    const result = await db.query(`SELECT cleanup_expired_${tableName}() as deleted_count;`);
+
+    const result = await db.query(
+      `SELECT cleanup_expired_${tableName}() as deleted_count;`,
+    );
     return result.rows[0]?.deleted_count || 0;
   } catch (error) {
     log.error('Failed to cleanup expired entries:', error);
@@ -287,31 +310,35 @@ export async function cleanupExpiredEntries(db: PoolType, schema?: PostgresSchem
 
 /**
  * Drop Nuvex schema (for cleanup/testing)
- * 
+ *
  * Completely removes all Nuvex-related database objects including tables,
  * functions, triggers, and indexes. This operation is irreversible and will
  * result in permanent data loss.
- * 
+ *
  * @param db - PostgreSQL connection pool
  * @returns Promise that resolves when schema is dropped
- * 
+ *
  * @example
  * ```typescript
  * // Use with extreme caution - this will delete all data!
  * await dropNuvexSchema(testDb); // Only use in tests
  * ```
- * 
+ *
  * @throws {Error} If the drop operation fails
- * 
+ *
  * @warning This operation is irreversible and will cause permanent data loss
  * @since 1.0.0
  */
-export async function dropNuvexSchema(db: PoolType, schema?: PostgresSchemaConfig, logger?: Logger): Promise<void> {
+export async function dropNuvexSchema(
+  db: PoolType,
+  schema?: PostgresSchemaConfig,
+  logger?: Logger,
+): Promise<void> {
   const log = logger ?? createDefaultLogger();
   try {
     const tableName = schema?.tableName || 'nuvex_storage';
     validateSQLIdentifier(tableName, 'table name');
-    
+
     await db.query(`
       DROP TRIGGER IF EXISTS trigger_update_${tableName}_updated_at ON ${tableName};
       DROP FUNCTION IF EXISTS update_${tableName}_updated_at();

@@ -36,7 +36,7 @@ Rules: lowercase type, present tense, no trailing period, description under 72 c
 
 - Use TypeScript with strict type checking — avoid `any`
 - Follow existing patterns in `src/` for consistency
-- Always run `pnpm lint` and `pnpm test` before suggesting code is complete
-- Prefer `pnpm validate` to verify the full build, lint, and test pipeline
-- Security linting is enforced via `eslint-plugin-security` — do not suppress security rules
+- Always run `bun run lint` and `bun test` before suggesting code is complete
+- Prefer `bun run validate` to verify the full build, lint, and test pipeline
+- Biome is the primary linter and formatter for this repository
 - All public-facing changes should include or update tests

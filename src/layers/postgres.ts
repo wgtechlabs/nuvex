@@ -1,10 +1,10 @@
 /**
  * Nuvex - PostgreSQL Storage Layer (L3)
  * Next-gen Unified Vault Experience
- * 
+ *
  * PostgreSQL persistent storage layer serving as the source of truth for all data.
  * Provides ACID-compliant, durable storage with full data integrity guarantees.
- * 
+ *
  * Features:
  * - ACID-compliant persistent storage
  * - Source of truth for all data
@@ -12,7 +12,7 @@
  * - Automatic TTL-based expiration
  * - Connection pooling for optimal performance
  * - Health monitoring with SELECT 1 queries
- * 
+ *
  * @author Waren Gonzaga, WG Technology Labs
  * @since 2025
  */
@@ -27,11 +27,11 @@ import { setupNuvexSchema, validateSQLIdentifier } from '../core/database.js';
 
 /**
  * PostgreSQL Storage Layer - L3 Persistent Storage
- * 
+ *
  * Implements persistent storage using PostgreSQL. This is the authoritative
  * source of truth for all data in the system. All writes must succeed here
  * for the operation to be considered successful.
- * 
+ *
  * **Key Features:**
  * - ACID compliance for data integrity
  * - Durable storage that survives restarts
@@ -39,24 +39,24 @@ import { setupNuvexSchema, validateSQLIdentifier } from '../core/database.js';
  * - TTL-based automatic expiration
  * - Connection pooling for performance
  * - Transaction support for complex operations
- * 
+ *
  * **Storage Schema:**
  * - Table: nuvex_storage
  * - Columns: id, key (unique), value (JSONB), expires_at, created_at, updated_at
  * - Indexes: key, expires_at, key pattern (trigram)
- * 
+ *
  * **Performance Characteristics:**
  * - Get: O(log n) with index lookup
  * - Set: O(log n) with index update
  * - Latency: 5-50ms typical (storage + network)
- * 
+ *
  * **Error Handling:**
  * - Returns null on read errors (graceful degradation)
  * - Logs errors for monitoring
  * - Throws on critical connection failures
- * 
+ *
  * @implements {StorageLayerInterface}
- * 
+ *
  * @example
  * ```typescript
  * // Create PostgreSQL layer
@@ -67,45 +67,45 @@ import { setupNuvexSchema, validateSQLIdentifier } from '../core/database.js';
  *   user: 'postgres',
  *   password: 'password'
  * });
- * 
+ *
  * // Connect (creates pool)
  * await postgres.connect();
- * 
+ *
  * // Store data (source of truth)
  * await postgres.set('user:123', userData, 86400);
- * 
+ *
  * // Retrieve data
  * const data = await postgres.get('user:123');
- * 
+ *
  * // Check health
  * const isHealthy = await postgres.ping();
  * ```
- * 
+ *
  * @class PostgresStorage
  * @since 1.0.0
  */
 export class PostgresStorage implements StorageLayerInterface {
   /** PostgreSQL connection pool */
   private pool: PoolType | null;
-  
+
   /** Database configuration or existing pool */
   private readonly config: PostgresConfig | PoolType;
-  
+
   /** Whether the pool is connected */
   private connected: boolean;
-  
+
   /** Optional logger for debugging and monitoring */
   private logger: Logger | null;
-  
+
   /** Whether we created the pool (vs. received existing one) */
   private readonly ownsPool: boolean;
 
   /** Table name for storage */
   private readonly tableName: string;
-  
+
   /** Key column name */
   private readonly keyColumn: string;
-  
+
   /** Value/data column name */
   private readonly valueColumn: string;
 
@@ -126,16 +126,16 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Creates a new PostgresStorage instance
-   * 
+   *
    * Accepts either a PostgreSQL configuration object or an existing Pool instance.
    * If a Pool is provided, the caller is responsible for managing its lifecycle.
-   * 
+   *
    * Schema configuration is extracted from the config object when creating a new pool.
    * When using an existing pool, schema defaults to standard Nuvex naming.
-   * 
+   *
    * @param config - PostgreSQL configuration or existing Pool instance
    * @param logger - Optional logger for debugging
-   * 
+   *
    * @example
    * ```typescript
    * // With configuration (supports schema customization)
@@ -149,7 +149,7 @@ export class PostgresStorage implements StorageLayerInterface {
    *     columns: { key: 'key', value: 'value' }
    *   }
    * });
-   * 
+   *
    * // With existing pool (uses default schema)
    * const existingPool = new Pool({ ... });
    * const postgres = new PostgresStorage(existingPool);
@@ -162,20 +162,28 @@ export class PostgresStorage implements StorageLayerInterface {
     this.logger = logger;
     this.schemaReady = false;
     this.lastSchemaIssue = null;
-    
+
     // Check if config is already a Pool instance
     this.ownsPool = !('query' in config && typeof config.query === 'function');
-    
+
     // Extract schema configuration with defaults
     // Note: Schema is only extracted from config objects, not from existing Pool instances
-    const schema = this.ownsPool ? (config as PostgresConfig).schema : undefined;
+    const schema = this.ownsPool
+      ? (config as PostgresConfig).schema
+      : undefined;
     this.tableName = schema?.tableName ?? 'nuvex_storage';
     this.keyColumn = schema?.columns?.key ?? 'nuvex_key';
     this.valueColumn = schema?.columns?.value ?? 'nuvex_data';
-    this.autoSetupSchema = this.ownsPool ? Boolean((config as PostgresConfig).autoSetupSchema) : false;
-    this.enableTrigram = this.ownsPool ? Boolean((config as PostgresConfig).enableTrigram) : false;
-    this.enableCleanupJob = this.ownsPool ? Boolean((config as PostgresConfig).enableCleanupJob) : false;
-    
+    this.autoSetupSchema = this.ownsPool
+      ? Boolean((config as PostgresConfig).autoSetupSchema)
+      : false;
+    this.enableTrigram = this.ownsPool
+      ? Boolean((config as PostgresConfig).enableTrigram)
+      : false;
+    this.enableCleanupJob = this.ownsPool
+      ? Boolean((config as PostgresConfig).enableCleanupJob)
+      : false;
+
     // Validate all identifiers to prevent SQL injection
     validateSQLIdentifier(this.tableName, 'table name');
     validateSQLIdentifier(this.keyColumn, 'key column name');
@@ -184,12 +192,12 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Establish connection to PostgreSQL
-   * 
+   *
    * Creates a connection pool (if not already provided) and tests the connection.
    * Should be called before any storage operations.
-   * 
+   *
    * @throws {Error} If connection test fails
-   * 
+   *
    * @example
    * ```typescript
    * try {
@@ -216,36 +224,44 @@ export class PostgresStorage implements StorageLayerInterface {
         this.connected = true;
 
         if (this.autoSetupSchema) {
-          this.log('info', 'PostgreSQL L3: Auto-setup enabled, ensuring Nuvex schema exists', {
-            tableName: this.tableName,
-            enableTrigram: this.enableTrigram,
-            enableCleanupJob: this.enableCleanupJob
-          });
-          await setupNuvexSchema(this.pool, {
-            enableTrigram: this.enableTrigram,
-            enableCleanupJob: this.enableCleanupJob,
-            schema: {
+          this.log(
+            'info',
+            'PostgreSQL L3: Auto-setup enabled, ensuring Nuvex schema exists',
+            {
               tableName: this.tableName,
-              columns: {
-                key: this.keyColumn,
-                value: this.valueColumn
-              }
-            }
-          }, this.logger ?? undefined);
+              enableTrigram: this.enableTrigram,
+              enableCleanupJob: this.enableCleanupJob,
+            },
+          );
+          await setupNuvexSchema(
+            this.pool,
+            {
+              enableTrigram: this.enableTrigram,
+              enableCleanupJob: this.enableCleanupJob,
+              schema: {
+                tableName: this.tableName,
+                columns: {
+                  key: this.keyColumn,
+                  value: this.valueColumn,
+                },
+              },
+            },
+            this.logger ?? undefined,
+          );
         }
 
         this.schemaReady = await this.isReady();
         this.log('info', 'PostgreSQL L3: Connected successfully', {
           tableName: this.tableName,
-          ready: this.schemaReady
+          ready: this.schemaReady,
         });
       }
     } catch (error) {
       this.connected = false;
       this.schemaReady = false;
       this.lastSchemaIssue = null;
-      this.log('error', 'PostgreSQL L3: Connection failed', { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', 'PostgreSQL L3: Connection failed', {
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -253,10 +269,10 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Close PostgreSQL connection pool
-   * 
+   *
    * Only closes the pool if we created it. If an existing pool was provided,
    * the caller is responsible for closing it.
-   * 
+   *
    * @example
    * ```typescript
    * await postgres.disconnect();
@@ -274,13 +290,13 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Retrieve a value from PostgreSQL
-   * 
+   *
    * Queries the nuvex_storage table and automatically filters out expired entries.
    * Deserializes the JSON-stored value.
-   * 
+   *
    * @param key - The key to retrieve
    * @returns Promise resolving to the value or null if not found/expired
-   * 
+   *
    * @example
    * ```typescript
    * const userData = await postgres.get('user:123');
@@ -297,7 +313,7 @@ export class PostgresStorage implements StorageLayerInterface {
     try {
       const result = await this.pool.query(
         `SELECT ${this.valueColumn} FROM ${this.tableName} WHERE ${this.keyColumn} = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
-        [key]
+        [key],
       );
 
       if (result.rows.length === 0) {
@@ -314,22 +330,22 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Store a value in PostgreSQL
-   * 
+   *
    * Inserts or updates the value in the nuvex_storage table. Uses UPSERT
    * (INSERT ... ON CONFLICT) to handle existing keys efficiently.
-   * 
+   *
    * **Note:** This is the authoritative write. If this fails, the entire
    * write operation should be considered failed.
-   * 
+   *
    * @param key - The key to store
    * @param value - The value to store (will be JSON serialized)
    * @param ttlSeconds - Optional TTL in seconds
-   * 
+   *
    * @example
    * ```typescript
    * // Store with 24 hour TTL
    * await postgres.set('user:123', userData, 86400);
-   * 
+   *
    * // Store without TTL (persists until deleted)
    * await postgres.set('config:app', configData);
    * ```
@@ -341,19 +357,21 @@ export class PostgresStorage implements StorageLayerInterface {
     }
 
     try {
-      const expiresAt = ttlSeconds ? new Date(Date.now() + (ttlSeconds * 1000)) : null;
-      
+      const expiresAt = ttlSeconds
+        ? new Date(Date.now() + ttlSeconds * 1000)
+        : null;
+
       await this.pool.query(
         `INSERT INTO ${this.tableName} (${this.keyColumn}, ${this.valueColumn}, expires_at) 
          VALUES ($1, $2, $3)
          ON CONFLICT (${this.keyColumn}) 
          DO UPDATE SET ${this.valueColumn} = $2, expires_at = $3, updated_at = NOW()`,
-        [key, JSON.stringify(value), expiresAt]
+        [key, JSON.stringify(value), expiresAt],
       );
     } catch (error) {
       // If table doesn't exist, this is a critical error for L3
-      this.log('error', `PostgreSQL L3: Error setting key: ${key}`, { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', `PostgreSQL L3: Error setting key: ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -361,11 +379,11 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Delete a value from PostgreSQL
-   * 
+   *
    * Permanently removes the key from the nuvex_storage table.
-   * 
+   *
    * @param key - The key to delete
-   * 
+   *
    * @example
    * ```typescript
    * await postgres.delete('user:123');
@@ -377,22 +395,25 @@ export class PostgresStorage implements StorageLayerInterface {
     }
 
     try {
-      await this.pool.query(`DELETE FROM ${this.tableName} WHERE ${this.keyColumn} = $1`, [key]);
+      await this.pool.query(
+        `DELETE FROM ${this.tableName} WHERE ${this.keyColumn} = $1`,
+        [key],
+      );
     } catch (error) {
-      this.log('error', `PostgreSQL L3: Error deleting key: ${key}`, { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', `PostgreSQL L3: Error deleting key: ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
   /**
    * Check if a key exists in PostgreSQL
-   * 
+   *
    * Queries for the key and verifies it hasn't expired.
-   * 
+   *
    * @param key - The key to check
    * @returns Promise resolving to true if the key exists and is not expired
-   * 
+   *
    * @example
    * ```typescript
    * if (await postgres.exists('user:123')) {
@@ -408,13 +429,13 @@ export class PostgresStorage implements StorageLayerInterface {
     try {
       const result = await this.pool.query(
         `SELECT 1 FROM ${this.tableName} WHERE ${this.keyColumn} = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
-        [key]
+        [key],
       );
-      
+
       return result.rows.length > 0;
     } catch (error) {
-      this.log('error', `PostgreSQL L3: Error checking existence: ${key}`, { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', `PostgreSQL L3: Error checking existence: ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
@@ -422,10 +443,10 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Clear all keys from PostgreSQL
-   * 
+   *
    * **WARNING:** This operation deletes all data from nuvex_storage table.
    * Use with extreme caution in production environments.
-   * 
+   *
    * @example
    * ```typescript
    * await postgres.clear(); // Deletes all data
@@ -440,21 +461,73 @@ export class PostgresStorage implements StorageLayerInterface {
       await this.pool.query(`DELETE FROM ${this.tableName}`);
       this.log('info', 'PostgreSQL L3: All data cleared');
     } catch (error) {
-      this.log('error', 'PostgreSQL L3: Error clearing data', { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', 'PostgreSQL L3: Error clearing data', {
+        error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  async keys(pattern = '*'): Promise<string[]> {
+    if (!this.connected || !this.pool) {
+      return [];
+    }
+
+    try {
+      const result = await this.pool.query(
+        `SELECT ${this.keyColumn} AS key
+         FROM ${this.tableName}
+         WHERE expires_at IS NULL OR expires_at > NOW()`,
+      );
+
+      const regex = this.createPatternRegex(pattern);
+      return result.rows
+        .map((row: { key: string }) => row.key)
+        .filter((key) => regex.test(key));
+    } catch (error) {
+      this.handleQueryError('keys', error, { pattern });
+      return [];
+    }
+  }
+
+  async getTtl(key: string): Promise<number | null> {
+    if (!this.connected || !this.pool) {
+      return null;
+    }
+
+    try {
+      const result = await this.pool.query(
+        `SELECT expires_at
+         FROM ${this.tableName}
+         WHERE ${this.keyColumn} = $1`,
+        [key],
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const expiresAt = result.rows[0].expires_at as Date | string | null;
+      if (!expiresAt) {
+        return null;
+      }
+
+      const remainingMs = new Date(expiresAt).getTime() - Date.now();
+      return remainingMs > 0 ? Math.ceil(remainingMs / 1000) : null;
+    } catch (error) {
+      this.handleQueryError('ttl', error, { key });
+      return null;
     }
   }
 
   /**
    * Health check for PostgreSQL connectivity
-   * 
+   *
    * Executes a simple SELECT 1 query to verify connectivity and database
    * responsiveness. This is a lightweight connectivity check only and does
    * not guarantee that the configured Nuvex schema exists or is writable.
-   * 
+   *
    * @returns Promise resolving to true if PostgreSQL is healthy and responsive
-   * 
+   *
    * @example
    * ```typescript
    * const isHealthy = await postgres.ping();
@@ -479,8 +552,8 @@ export class PostgresStorage implements StorageLayerInterface {
         client.release();
       }
     } catch (error) {
-      this.log('error', 'PostgreSQL L3: Ping failed', { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', 'PostgreSQL L3: Ping failed', {
+        error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
@@ -510,13 +583,16 @@ export class PostgresStorage implements StorageLayerInterface {
 
       const tableResult = await client.query(
         'SELECT to_regclass($1) as table_name',
-        [normalizedTableName]
+        [normalizedTableName],
       );
       if (!tableResult.rows[0]?.table_name) {
-        this.markSchemaUnready('PostgreSQL L3: Nuvex schema is not ready - storage table is missing', {
-          tableName: this.tableName,
-          autoSetupSchema: this.autoSetupSchema
-        });
+        this.markSchemaUnready(
+          'PostgreSQL L3: Nuvex schema is not ready - storage table is missing',
+          {
+            tableName: this.tableName,
+            autoSetupSchema: this.autoSetupSchema,
+          },
+        );
         return false;
       }
 
@@ -526,18 +602,26 @@ export class PostgresStorage implements StorageLayerInterface {
          WHERE table_schema = current_schema()
            AND table_name = $1
            AND column_name IN ($2, $3)`,
-        [normalizedTableName, normalizedKeyColumn, normalizedValueColumn]
+        [normalizedTableName, normalizedKeyColumn, normalizedValueColumn],
       );
 
       const availableColumns = new Set(
-        columnsResult.rows.map((row: Record<string, string>) => row.column_name.toLowerCase())
+        columnsResult.rows.map((row: Record<string, string>) =>
+          row.column_name.toLowerCase(),
+        ),
       );
-      if (!availableColumns.has(normalizedKeyColumn) || !availableColumns.has(normalizedValueColumn)) {
-        this.markSchemaUnready('PostgreSQL L3: Nuvex schema is not ready - expected columns are missing', {
-          tableName: this.tableName,
-          keyColumn: this.keyColumn,
-          valueColumn: this.valueColumn
-        });
+      if (
+        !availableColumns.has(normalizedKeyColumn) ||
+        !availableColumns.has(normalizedValueColumn)
+      ) {
+        this.markSchemaUnready(
+          'PostgreSQL L3: Nuvex schema is not ready - expected columns are missing',
+          {
+            tableName: this.tableName,
+            keyColumn: this.keyColumn,
+            valueColumn: this.valueColumn,
+          },
+        );
         return false;
       }
 
@@ -548,7 +632,7 @@ export class PostgresStorage implements StorageLayerInterface {
          VALUES ($1, $2::jsonb, NULL)
          ON CONFLICT (${this.keyColumn})
          DO UPDATE SET ${this.valueColumn} = EXCLUDED.${this.valueColumn}, updated_at = NOW()`,
-        [readinessKey, JSON.stringify({ ready: true })]
+        [readinessKey, JSON.stringify({ ready: true })],
       );
       await client.query('ROLLBACK');
 
@@ -567,7 +651,7 @@ export class PostgresStorage implements StorageLayerInterface {
       this.handleQueryError('readiness', error, {
         tableName: this.tableName,
         keyColumn: this.keyColumn,
-        valueColumn: this.valueColumn
+        valueColumn: this.valueColumn,
       });
       this.schemaReady = false;
       return false;
@@ -580,7 +664,7 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Check if PostgreSQL is connected
-   * 
+   *
    * @returns True if connected
    */
   isConnected(): boolean {
@@ -589,11 +673,11 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Get the PostgreSQL connection pool
-   * 
+   *
    * Useful for executing custom queries or transactions.
-   * 
+   *
    * @returns The connection pool or null if not connected
-   * 
+   *
    * @example
    * ```typescript
    * const pool = postgres.getPool();
@@ -608,32 +692,40 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Atomically increment a numeric value
-   * 
+   *
    * Uses PostgreSQL UPDATE with row-level locking for true atomic increments.
    * If the key doesn't exist, it's created with the delta value.
-   * 
+   *
    * This operation is safe for concurrent access across multiple instances.
-   * 
+   *
    * @param key - The key to increment
    * @param delta - The amount to increment by
    * @param ttlSeconds - Optional TTL in seconds
    * @returns Promise resolving to the new value after increment
-   * 
+   *
    * @example
    * ```typescript
    * // Atomic increment - safe for concurrent access
    * const newValue = await postgres.increment('counter', 1, 86400);
    * ```
    */
-  async increment(key: string, delta: number, ttlSeconds?: number): Promise<number> {
+  async increment(
+    key: string,
+    delta: number,
+    ttlSeconds?: number,
+  ): Promise<number> {
     if (!this.connected || !this.pool) {
-      this.log('warn', 'PostgreSQL L3: Cannot increment - not connected', { key });
+      this.log('warn', 'PostgreSQL L3: Cannot increment - not connected', {
+        key,
+      });
       throw new Error('PostgreSQL not connected');
     }
 
     try {
-      const expiresAt = ttlSeconds ? new Date(Date.now() + (ttlSeconds * 1000)) : null;
-      
+      const expiresAt = ttlSeconds
+        ? new Date(Date.now() + ttlSeconds * 1000)
+        : null;
+
       // Atomic upsert to handle both insert and update cases
       // This avoids race conditions when multiple concurrent increments happen on non-existent keys
       const result = await this.pool.query(
@@ -650,7 +742,7 @@ export class PostgresStorage implements StorageLayerInterface {
                expires_at = EXCLUDED.expires_at,
                updated_at = NOW()
          RETURNING (${this.valueColumn}::text)::numeric as value`,
-        [key, delta, expiresAt]
+        [key, delta, expiresAt],
       );
 
       if (result.rows.length > 0) {
@@ -660,8 +752,8 @@ export class PostgresStorage implements StorageLayerInterface {
       // Fallback: should not reach here, but return delta if no rows returned
       return delta;
     } catch (error) {
-      this.log('error', `PostgreSQL L3: Error incrementing key: ${key}`, { 
-        error: error instanceof Error ? error.message : String(error) 
+      this.log('error', `PostgreSQL L3: Error incrementing key: ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -669,39 +761,65 @@ export class PostgresStorage implements StorageLayerInterface {
 
   /**
    * Log a message if logger is configured
-   * 
+   *
    * @private
    * @param level - Log level
    * @param message - Log message
    * @param meta - Optional metadata
    */
-  private log(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>): void {
+  private log(
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    meta?: Record<string, unknown>,
+  ): void {
     if (this.logger) {
       this.logger[level](message, meta);
     }
   }
 
-  private handleQueryError(operation: string, error: unknown, meta: Record<string, unknown> = {}): void {
+  private createPatternRegex(pattern: string): RegExp {
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    return new RegExp(`^${escaped}$`);
+  }
+
+  private handleQueryError(
+    operation: string,
+    error: unknown,
+    meta: Record<string, unknown> = {},
+  ): void {
     const pgError = error as { code?: string; message?: string };
     const details = {
       ...meta,
       tableName: this.tableName,
       keyColumn: this.keyColumn,
       valueColumn: this.valueColumn,
-      error: pgError.message ?? String(error)
+      error: pgError.message ?? String(error),
     };
 
     if (pgError.code === '42P01') {
-      this.markSchemaUnready(`PostgreSQL L3: ${operation} failed because the Nuvex schema is missing`, details);
+      this.markSchemaUnready(
+        `PostgreSQL L3: ${operation} failed because the Nuvex schema is missing`,
+        details,
+      );
       return;
     }
 
     if (pgError.code === '42703') {
-      this.markSchemaUnready(`PostgreSQL L3: ${operation} failed because the Nuvex schema is incompatible`, details);
+      this.markSchemaUnready(
+        `PostgreSQL L3: ${operation} failed because the Nuvex schema is incompatible`,
+        details,
+      );
       return;
     }
 
-    this.log(operation === 'get' ? 'debug' : 'error', `PostgreSQL L3: ${operation} failed`, details);
+    this.log(
+      operation === 'get' ? 'debug' : 'error',
+      `PostgreSQL L3: ${operation} failed`,
+      details,
+    );
   }
 
   /**
@@ -714,7 +832,10 @@ export class PostgresStorage implements StorageLayerInterface {
    * @param message - Schema readiness log message
    * @param meta - Structured metadata for diagnostics
    */
-  private markSchemaUnready(message: string, meta: Record<string, unknown>): void {
+  private markSchemaUnready(
+    message: string,
+    meta: Record<string, unknown>,
+  ): void {
     const shouldWarn = this.schemaReady || this.lastSchemaIssue !== message;
 
     this.schemaReady = false;

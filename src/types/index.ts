@@ -1,11 +1,11 @@
 /**
  * Nuvex - Type Definitions
  * Next-gen Unified Vault Experience
- * 
+ *
  * Comprehensive type definitions for the multi-layer storage SDK.
  * Provides type safety and IntelliSense support for all storage operations,
  * configurations, and data structures.
- * 
+ *
  * @author Waren Gonzaga, WG Technology Labs
  * @since 2025
  */
@@ -16,10 +16,10 @@ import type { Logger } from '../interfaces/index.js';
 
 /**
  * PostgreSQL schema configuration
- * 
+ *
  * Configurable table and column names for PostgreSQL storage layer.
  * Enables backwards compatibility with existing applications and custom naming conventions.
- * 
+ *
  * @interface PostgresSchemaConfig
  */
 export interface PostgresSchemaConfig {
@@ -36,10 +36,10 @@ export interface PostgresSchemaConfig {
 
 /**
  * PostgreSQL database configuration
- * 
+ *
  * Configuration options for the PostgreSQL storage layer, which serves as
  * the persistent storage tier in the multi-layer architecture.
- * 
+ *
  * @interface PostgresConfig
  */
 export interface PostgresConfig {
@@ -73,10 +73,10 @@ export interface PostgresConfig {
 
 /**
  * Redis cache configuration
- * 
+ *
  * Configuration options for the Redis storage layer, which serves as
  * the distributed cache tier for improved performance.
- * 
+ *
  * @interface RedisConfig
  */
 export interface RedisConfig {
@@ -92,10 +92,10 @@ export interface RedisConfig {
 
 /**
  * Memory cache configuration
- * 
+ *
  * Configuration options for the in-memory storage layer, which provides
  * the fastest access tier in the multi-layer architecture.
- * 
+ *
  * @interface MemoryConfig
  */
 export interface MemoryConfig {
@@ -109,9 +109,9 @@ export interface MemoryConfig {
 
 /**
  * Logging configuration
- * 
+ *
  * Configuration options for logging and monitoring throughout the storage system.
- * 
+ *
  * @interface LoggingConfig
  */
 export interface LoggingConfig {
@@ -131,11 +131,11 @@ export interface LoggingConfig {
 
 /**
  * Main Nuvex configuration
- * 
+ *
  * Root configuration object that defines all storage layers and system behavior.
  * Only PostgreSQL configuration is required - Redis and memory layers are optional
  * but highly recommended for optimal performance.
- * 
+ *
  * @interface NuvexConfig
  */
 export interface NuvexConfig {
@@ -153,10 +153,10 @@ export interface NuvexConfig {
 
 /**
  * Storage operation options
- * 
+ *
  * Configuration options that can be applied to individual storage operations
  * to customize behavior, targeting, and performance characteristics.
- * 
+ *
  * @interface StorageOptions
  */
 export interface StorageOptions {
@@ -170,10 +170,10 @@ export interface StorageOptions {
 
 /**
  * Storage performance metrics
- * 
+ *
  * Comprehensive metrics about storage operations and performance across
  * all layers. Used for monitoring, optimization, and debugging.
- * 
+ *
  * @interface StorageMetrics
  */
 export interface StorageMetrics {
@@ -197,7 +197,7 @@ export interface StorageMetrics {
 
 /**
  * Memory layer specific metrics
- * 
+ *
  * @interface MemoryMetrics
  */
 export interface MemoryMetrics {
@@ -213,7 +213,7 @@ export interface MemoryMetrics {
 
 /**
  * Redis layer specific metrics
- * 
+ *
  * @interface RedisMetrics
  */
 export interface RedisMetrics {
@@ -225,7 +225,7 @@ export interface RedisMetrics {
 
 /**
  * PostgreSQL layer specific metrics
- * 
+ *
  * @interface PostgresMetrics
  */
 export interface PostgresMetrics {
@@ -237,7 +237,7 @@ export interface PostgresMetrics {
 
 /**
  * All metrics including layer-specific and overall metrics
- * 
+ *
  * @interface AllMetrics
  */
 export interface AllMetrics extends StorageMetrics {
@@ -251,14 +251,18 @@ export interface AllMetrics extends StorageMetrics {
 
 /**
  * Layer-specific metrics union type
- * 
+ *
  * @type LayerMetrics
  */
-export type LayerMetrics = MemoryMetrics | RedisMetrics | PostgresMetrics | AllMetrics;
+export type LayerMetrics =
+  | MemoryMetrics
+  | RedisMetrics
+  | PostgresMetrics
+  | AllMetrics;
 
 /**
  * Health check result for all layers
- * 
+ *
  * @interface AllLayersHealth
  */
 export interface AllLayersHealth {
@@ -272,7 +276,7 @@ export interface AllLayersHealth {
 
 /**
  * Health check result for memory layer only
- * 
+ *
  * @interface MemoryHealth
  */
 export interface MemoryHealth {
@@ -282,7 +286,7 @@ export interface MemoryHealth {
 
 /**
  * Health check result for Redis layer only
- * 
+ *
  * @interface RedisHealth
  */
 export interface RedisHealth {
@@ -292,7 +296,7 @@ export interface RedisHealth {
 
 /**
  * Health check result for PostgreSQL layer only
- * 
+ *
  * @interface PostgresHealth
  */
 export interface PostgresHealth {
@@ -302,17 +306,21 @@ export interface PostgresHealth {
 
 /**
  * Layer-specific health union type
- * 
+ *
  * @type LayerHealth
  */
-export type LayerHealth = MemoryHealth | RedisHealth | PostgresHealth | AllLayersHealth;
+export type LayerHealth =
+  | MemoryHealth
+  | RedisHealth
+  | PostgresHealth
+  | AllLayersHealth;
 
 /**
  * Storage item metadata
- * 
+ *
  * Metadata associated with a stored item, including lifecycle information
  * and layer-specific details.
- * 
+ *
  * @template T - The type of the stored value
  * @interface StorageItem
  */
@@ -327,14 +335,28 @@ export interface StorageItem<T = unknown> {
   layer: StorageLayer;
 }
 
+/**
+ * Query item metadata
+ *
+ * Metadata that can be returned reliably from query operations today.
+ * Additional fields can be added as the storage layers expose durable
+ * metadata for enumeration.
+ *
+ * @interface QueryItemMetadata
+ */
+export interface QueryItemMetadata {
+  /** Which storage layer currently holds the returned item */
+  layer?: StorageLayer;
+}
+
 // ===== Operation Types =====
 
 /**
  * Batch operation definition
- * 
+ *
  * Defines a single operation within a batch request. Supports set, get,
  * and delete operations with optional per-operation configuration.
- * 
+ *
  * @interface BatchOperation
  */
 export interface BatchOperation {
@@ -350,10 +372,10 @@ export interface BatchOperation {
 
 /**
  * Batch operation result
- * 
+ *
  * Result of a single operation within a batch request, including
  * success status and any returned data or error information.
- * 
+ *
  * @template T - The type of the returned value
  * @interface BatchResult
  */
@@ -370,10 +392,10 @@ export interface BatchResult<T = unknown> {
 
 /**
  * Query operation options
- * 
+ *
  * Configuration for advanced query operations that can search across
  * multiple keys and return filtered, sorted, and paginated results.
- * 
+ *
  * @interface QueryOptions
  */
 export interface QueryOptions {
@@ -384,23 +406,23 @@ export interface QueryOptions {
   /** Number of results to skip (for pagination) */
   offset?: number;
   /** Field to sort results by */
-  sortBy?: 'key' | 'createdAt' | 'expiresAt';
+  sortBy?: 'key';
   /** Sort order direction */
   sortOrder?: 'asc' | 'desc';
 }
 
 /**
  * Query operation result
- * 
+ *
  * Results from a query operation, including the matching items,
  * pagination information, and metadata.
- * 
+ *
  * @template T - The type of the stored values
  * @interface QueryResult
  */
 export interface QueryResult<T = unknown> {
-  /** Array of matching items with their metadata */
-  items: Array<{ key: string; value: T; metadata: StorageItem<T> }>;
+  /** Array of matching items with currently available metadata */
+  items: Array<{ key: string; value: T; metadata?: QueryItemMetadata }>;
   /** Total number of matching items (before pagination) */
   total: number;
   /** Whether there are more results available */
@@ -411,10 +433,10 @@ export interface QueryResult<T = unknown> {
 
 /**
  * Storage layer enumeration
- * 
+ *
  * Defines the available storage layers in the multi-tier architecture.
  * Each layer has different performance characteristics and use cases.
- * 
+ *
  * @enum {string}
  */
 export enum StorageLayer {
@@ -423,14 +445,14 @@ export enum StorageLayer {
   /** Redis cache layer - fast distributed cache, configurable persistence */
   REDIS = 'redis',
   /** PostgreSQL layer - persistent storage, ACID compliance */
-  POSTGRES = 'postgres'
+  POSTGRES = 'postgres',
 }
 
 /**
  * Logging level enumeration
- * 
+ *
  * Defines the available logging levels for the system logger.
- * 
+ *
  * @enum {string}
  */
 export enum LogLevel {
@@ -441,7 +463,7 @@ export enum LogLevel {
   /** Warning messages for non-critical issues */
   WARN = 'warn',
   /** Error messages for failures and exceptions */
-  ERROR = 'error'
+  ERROR = 'error',
 }
 
 // ===== Export all types =====

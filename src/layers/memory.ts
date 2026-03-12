@@ -1,16 +1,16 @@
 /**
  * Nuvex - Memory Storage Layer (L1)
  * Next-gen Unified Vault Experience
- * 
+ *
  * In-memory cache layer with LRU (Least Recently Used) eviction policy.
  * Provides the fastest access tier in the multi-layer storage architecture.
- * 
+ *
  * Features:
  * - LRU eviction with configurable maxSize
  * - TTL-based expiration
  * - Sub-millisecond access times
  * - Automatic cleanup of expired entries
- * 
+ *
  * @author Waren Gonzaga, WG Technology Labs
  * @since 2025
  */
@@ -30,67 +30,67 @@ interface MemoryCacheEntry {
 
 /**
  * Memory Storage Layer - L1 Cache with LRU Eviction
- * 
+ *
  * Implements an in-memory cache with Least Recently Used (LRU) eviction policy.
  * This layer provides the fastest access times but has limited capacity defined
  * by maxSize. When the cache is full, the least recently accessed item is evicted
  * to make room for new entries.
- * 
+ *
  * **LRU Implementation:**
  * - Uses JavaScript Map which maintains insertion order
  * - On get(), moves accessed entry to end (marks as recently used)
  * - On set(), evicts first entry (oldest/least recently used) when full
  * - Combines LRU with TTL-based expiration for optimal memory management
- * 
+ *
  * **Performance Characteristics:**
  * - Get: O(1) average, O(n) worst case due to delete+set for LRU
  * - Set: O(1) with occasional O(1) eviction
  * - Memory: O(maxSize)
- * 
+ *
  * @implements {StorageLayerInterface}
- * 
+ *
  * @example
  * ```typescript
  * // Create memory layer with 1000 entry limit
  * const memory = new MemoryStorage(1000);
- * 
+ *
  * // Store with 60 second TTL
  * await memory.set('user:123', userData, 60);
- * 
+ *
  * // Retrieve (marks as recently used)
  * const data = await memory.get('user:123');
- * 
+ *
  * // Check health
  * const isHealthy = await memory.ping(); // Always true
  * ```
- * 
+ *
  * @class MemoryStorage
  * @since 1.0.0
  */
 export class MemoryStorage implements StorageLayerInterface {
   /** In-memory cache using Map for LRU ordering */
   private cache: Map<string, MemoryCacheEntry>;
-  
+
   /** Maximum number of entries before LRU eviction kicks in */
   private readonly maxSize: number;
-  
+
   /** Optional logger for debugging and monitoring */
   private logger: Logger | null;
 
   /**
    * Creates a new MemoryStorage instance
-   * 
+   *
    * @param maxSize - Maximum number of entries to store (default: 10,000)
    * @param logger - Optional logger for debugging
-   * 
+   *
    * @example
    * ```typescript
    * // Default configuration
    * const memory = new MemoryStorage();
-   * 
+   *
    * // Custom size limit
    * const memory = new MemoryStorage(5000);
-   * 
+   *
    * // With logging
    * const memory = new MemoryStorage(10000, console);
    * ```
@@ -103,13 +103,13 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Retrieve a value from memory cache
-   * 
+   *
    * Implements LRU by moving accessed entries to the end of the Map,
    * marking them as recently used. Automatically removes expired entries.
-   * 
+   *
    * @param key - The key to retrieve
    * @returns Promise resolving to the value or null if not found/expired
-   * 
+   *
    * @example
    * ```typescript
    * const value = await memory.get('user:123');
@@ -141,20 +141,20 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Store a value in memory cache
-   * 
+   *
    * Implements LRU eviction when cache is full. If the cache has reached
    * maxSize and the key doesn't already exist, the oldest entry (first in Map)
    * is evicted to make room for the new entry.
-   * 
+   *
    * @param key - The key to store
    * @param value - The value to store
    * @param ttlSeconds - Optional TTL in seconds
-   * 
+   *
    * @example
    * ```typescript
    * // Store without TTL
    * await memory.set('config:app', configData);
-   * 
+   *
    * // Store with 5 minute TTL
    * await memory.set('session:abc', sessionData, 300);
    * ```
@@ -172,7 +172,7 @@ export class MemoryStorage implements StorageLayerInterface {
     // Create entry with optional expiration
     const entry: MemoryCacheEntry = { value };
     if (ttlSeconds) {
-      entry.expires = Date.now() + (ttlSeconds * 1000);
+      entry.expires = Date.now() + ttlSeconds * 1000;
     }
 
     this.cache.set(key, entry);
@@ -180,9 +180,9 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Delete a value from memory cache
-   * 
+   *
    * @param key - The key to delete
-   * 
+   *
    * @example
    * ```typescript
    * await memory.delete('user:123');
@@ -194,13 +194,13 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Check if a key exists in memory cache
-   * 
+   *
    * Verifies existence and checks if the entry has expired.
    * Automatically removes expired entries.
-   * 
+   *
    * @param key - The key to check
    * @returns Promise resolving to true if the key exists and is not expired
-   * 
+   *
    * @example
    * ```typescript
    * if (await memory.exists('user:123')) {
@@ -225,9 +225,9 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Clear all entries from memory cache
-   * 
+   *
    * Removes all stored entries, resetting the cache to empty state.
-   * 
+   *
    * @example
    * ```typescript
    * await memory.clear();
@@ -241,18 +241,18 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Get all keys matching an optional pattern
-   * 
+   *
    * Returns all non-expired keys from the memory cache, optionally filtered
    * by a glob pattern. Supports '*' (match any characters) and '?' (match single character).
-   * 
+   *
    * @param pattern - Optional glob pattern (default: '*' returns all keys)
    * @returns Promise resolving to array of matching keys
-   * 
+   *
    * @example
    * ```typescript
    * // Get all keys
    * const allKeys = await memory.keys();
-   * 
+   *
    * // Get keys matching pattern
    * const userKeys = await memory.keys('user:*');
    * ```
@@ -260,20 +260,20 @@ export class MemoryStorage implements StorageLayerInterface {
   async keys(pattern?: string): Promise<string[]> {
     const now = Date.now();
     const matchingKeys: string[] = [];
-    
+
     for (const [key, entry] of this.cache.entries()) {
       // Skip expired entries
       if (entry.expires && now > entry.expires) {
         this.cache.delete(key);
         continue;
       }
-      
+
       // If no pattern or wildcard, include all keys
       if (!pattern || pattern === '*') {
         matchingKeys.push(key);
         continue;
       }
-      
+
       // Simple glob pattern matching
       // Escape regex special chars, then convert glob wildcards
       const escaped = pattern
@@ -285,18 +285,33 @@ export class MemoryStorage implements StorageLayerInterface {
         matchingKeys.push(key);
       }
     }
-    
+
     return matchingKeys;
+  }
+
+  async getTtl(key: string): Promise<number | null> {
+    const entry = this.cache.get(key);
+    if (!entry?.expires) {
+      return null;
+    }
+
+    const remainingMs = entry.expires - Date.now();
+    if (remainingMs <= 0) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return Math.ceil(remainingMs / 1000);
   }
 
   /**
    * Health check for memory storage layer
-   * 
+   *
    * Memory storage is always available if the application is running,
    * so this method always returns true unless there's a critical failure.
-   * 
+   *
    * @returns Promise resolving to true (memory is always available)
-   * 
+   *
    * @example
    * ```typescript
    * const isHealthy = await memory.ping();
@@ -320,12 +335,12 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Get current cache size
-   * 
+   *
    * Returns the number of entries currently stored in the cache.
    * Useful for monitoring and debugging.
-   * 
+   *
    * @returns Current number of entries in cache
-   * 
+   *
    * @example
    * ```typescript
    * console.log(`Cache usage: ${memory.size()}/${memory.getMaxSize()}`);
@@ -337,9 +352,9 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Get maximum cache size
-   * 
+   *
    * Returns the configured maximum number of entries.
-   * 
+   *
    * @returns Maximum cache size
    */
   getMaxSize(): number {
@@ -348,12 +363,12 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Clean up expired entries
-   * 
+   *
    * Iterates through all entries and removes expired ones.
    * This is useful for manual cleanup or scheduled maintenance.
-   * 
+   *
    * @returns Number of entries removed
-   * 
+   *
    * @example
    * ```typescript
    * const cleaned = await memory.cleanup();
@@ -372,7 +387,10 @@ export class MemoryStorage implements StorageLayerInterface {
     }
 
     if (cleaned > 0) {
-      this.log('debug', `Memory L1: Cleanup removed ${cleaned} expired entries`);
+      this.log(
+        'debug',
+        `Memory L1: Cleanup removed ${cleaned} expired entries`,
+      );
     }
 
     return cleaned;
@@ -380,24 +398,28 @@ export class MemoryStorage implements StorageLayerInterface {
 
   /**
    * Atomically increment a numeric value
-   * 
+   *
    * This operation is thread-safe for single-instance deployments.
    * If the key doesn't exist or is expired, it's initialized to 0 before incrementing.
-   * 
+   *
    * @param key - The key to increment
    * @param delta - The amount to increment by (can be negative for decrement)
    * @param ttlSeconds - Optional TTL in seconds
    * @returns Promise resolving to the new value after increment
-   * 
+   *
    * @example
    * ```typescript
    * const newValue = await memory.increment('counter', 1, 60);
    * console.log(`Counter is now: ${newValue}`);
    * ```
    */
-  async increment(key: string, delta: number, ttlSeconds?: number): Promise<number> {
+  async increment(
+    key: string,
+    delta: number,
+    ttlSeconds?: number,
+  ): Promise<number> {
     const entry = this.cache.get(key);
-    
+
     // Check if entry exists and is not expired
     let currentValue = 0;
     if (entry) {
@@ -408,25 +430,29 @@ export class MemoryStorage implements StorageLayerInterface {
         currentValue = typeof entry.value === 'number' ? entry.value : 0;
       }
     }
-    
+
     // Calculate new value
     const newValue = currentValue + delta;
-    
+
     // Store the new value (this also handles LRU eviction if needed)
     await this.set(key, newValue, ttlSeconds);
-    
+
     return newValue;
   }
 
   /**
    * Log a message if logger is configured
-   * 
+   *
    * @private
    * @param level - Log level
    * @param message - Log message
    * @param meta - Optional metadata
    */
-  private log(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>): void {
+  private log(
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    meta?: Record<string, unknown>,
+  ): void {
     if (this.logger) {
       this.logger[level](message, meta);
     }

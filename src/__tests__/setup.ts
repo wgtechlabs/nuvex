@@ -4,7 +4,11 @@
  */
 
 import { beforeAll, afterAll, setDefaultTimeout, expect } from 'bun:test';
-import { initializeTestEnvironment, validateTestEnvironment, cleanupTestEnvironment } from './fixtures/config.js';
+import {
+  initializeTestEnvironment,
+  validateTestEnvironment,
+  cleanupTestEnvironment,
+} from './fixtures/config.js';
 
 // Initialize secure test environment
 initializeTestEnvironment();
@@ -40,14 +44,26 @@ afterAll(() => {
 
 // Type augmentation for custom Bun Test matchers
 declare module 'bun:test' {
-  interface Matchers<R> {
-    toBeWithinRange(floor: number, ceiling: number): R;
+  interface Matchers<T> {
+    toBeWithinRange(floor: number, ceiling: number): T;
+  }
+
+  interface AsymmetricMatchers {
+    toBeWithinRange(floor: number, ceiling: number): void;
   }
 }
 
 // Custom Bun Test matchers
 expect.extend({
-  toBeWithinRange(received: number, floor: number, ceiling: number) {
+  toBeWithinRange(expected: unknown, floor: number, ceiling: number) {
+    if (typeof expected !== 'number') {
+      return {
+        message: () => `expected ${String(expected)} to be a number`,
+        pass: false,
+      };
+    }
+
+    const received = expected;
     const pass = received >= floor && received <= ceiling;
     if (pass) {
       return {

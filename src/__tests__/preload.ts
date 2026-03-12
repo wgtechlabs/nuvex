@@ -10,13 +10,13 @@ import { MockRedisClient } from './mocks/redis.mock.js';
 import { MockPgPool } from './mocks/postgres.mock.js';
 
 mock.module('redis', () => ({
-  createClient: mock(() => new MockRedisClient())
+  createClient: mock(() => new MockRedisClient()),
 }));
 
 mock.module('pg', () => {
   const Pool = mock(() => new MockPgPool());
   return {
     default: { Pool },
-    Pool
+    Pool,
   };
 });
