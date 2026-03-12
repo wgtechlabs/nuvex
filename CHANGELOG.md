@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [0.2.1] - 2026-03-12
+
+### Changed
+
+- address postgres review feedback
+- add postgres schema readiness
+
 ## [0.2.0] - 2026-02-22
 
 ### Added
