@@ -17,6 +17,6 @@ jobs:
           fetch-depth: 0
 
       - name: Release and Publish
-        uses: wgtechlabs/release-build-flow-action@v1.4.3
+        uses: wgtechlabs/release-build-flow-action@v1.7.0
         with:
           github-token: ${{ secrets.GH_PAT }}

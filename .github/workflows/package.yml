@@ -6,6 +6,9 @@ on:
     branches:
       - main
       - dev
+  release:
+    types:
+      - published
 
 jobs:
   build-and-package:
@@ -18,35 +21,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build
-        run: bun run build
-
-      - name: Setup Node.js for npm publish
-        uses: actions/setup-node@v4
+      - name: Build and Publish
+        id: build
+        uses: wgtechlabs/package-build-flow-action@v2.1.0
         with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Setup Node.js for GitHub Packages publish
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://npm.pkg.github.com"
-
-      - name: Publish to GitHub Packages
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          registry: both
+          package-manager: bun
+          build-script: build
+          npm-token: ${{ secrets.NPM_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
