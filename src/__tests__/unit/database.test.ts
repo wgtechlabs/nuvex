@@ -60,7 +60,6 @@ describe('Database Utilities', () => {
 
       await setupNuvexSchema(mockDb, options);
 
-      expect(querySpy).toHaveBeenCalledWith('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
       expect(querySpy).toHaveBeenCalledWith(generateNuvexSchemaSQL(undefined, { enableTrigram: true }));
     });
 
@@ -105,7 +104,6 @@ describe('Database Utilities', () => {
 
       await setupNuvexSchema(mockDb, options);
 
-      expect(querySpy).toHaveBeenCalledWith('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
       expect(querySpy).toHaveBeenCalledWith(generateNuvexSchemaSQL(undefined, { enableTrigram: true }));
       expect(querySpy).toHaveBeenCalledWith(
         expect.stringContaining('cron.schedule'),

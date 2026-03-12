@@ -185,11 +185,6 @@ export async function setupNuvexSchema(
 ): Promise<void> {
   const log = logger ?? createDefaultLogger();
   try {
-    // Enable pg_trgm extension if requested (for pattern matching)
-    if (options.enableTrigram) {
-      await db.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-    }
-    
     // Generate schema SQL with custom table/column names if provided
     const schemaSQL = generateNuvexSchemaSQL(options.schema, {
       enableTrigram: options.enableTrigram
