@@ -1069,7 +1069,7 @@ export class StorageEngine implements Storage {
    * **Layer Health Checks:**
    * - Memory (L1): Always healthy if app is running
    * - Redis (L2): PING command verification
-   * - PostgreSQL (L3): SELECT 1 query verification
+   * - PostgreSQL (L3): Nuvex schema readiness verification
    * 
    * @param layers - Optional layer(s) to check. If not provided, checks all layers.
    *                 Can be a single layer string or array of layer strings.
@@ -1129,7 +1129,7 @@ export class StorageEngine implements Storage {
           layerNames.push('redis');
           break;
         case 'postgres':
-          promises.push(this.l3Postgres ? this.l3Postgres.ping() : Promise.resolve(false));
+          promises.push(this.l3Postgres ? this.l3Postgres.isReady() : Promise.resolve(false));
           layerNames.push('postgres');
           break;
       }

@@ -502,8 +502,9 @@ export class NuvexClient implements IStore {
   /**
    * Health check for all storage layers or specific layer(s)
    * 
-   * Performs comprehensive health checks on configured storage layers
-   * using the underlying engine's ping() methods for each layer.
+   * Performs comprehensive health checks on configured storage layers.
+   * PostgreSQL health reflects Nuvex storage readiness, not just raw
+   * database connectivity.
    * 
    * @param layers - Optional layer(s) to check. If not provided, checks all layers.
    *                 Can be a single layer string or array of layer strings.

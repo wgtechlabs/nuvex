@@ -8,6 +8,7 @@ import {
   setupNuvexSchema,
   cleanupExpiredEntries,
   dropNuvexSchema,
+  generateNuvexSchemaSQL,
   NUVEX_SCHEMA_SQL,
   SchemaSetupOptions
 } from '../../core/database';
@@ -37,6 +38,8 @@ describe('Database Utilities', () => {
       expect(NUVEX_SCHEMA_SQL).toContain('idx_nuvex_storage_expires_at');
       expect(NUVEX_SCHEMA_SQL).toContain('update_nuvex_storage_updated_at');
       expect(NUVEX_SCHEMA_SQL).toContain('cleanup_expired_nuvex_storage');
+      expect(NUVEX_SCHEMA_SQL).not.toContain('pg_trgm');
+      expect(NUVEX_SCHEMA_SQL).not.toContain('idx_nuvex_storage_key_pattern');
     });
   });
 
@@ -47,6 +50,7 @@ describe('Database Utilities', () => {
       await setupNuvexSchema(mockDb);
 
       expect(querySpy).toHaveBeenCalledWith(NUVEX_SCHEMA_SQL);
+      expect(querySpy).not.toHaveBeenCalledWith('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
       expect(console.log).toHaveBeenCalledWith('Nuvex database schema setup completed successfully');
     });
 
@@ -56,9 +60,10 @@ describe('Database Utilities', () => {
 
       await setupNuvexSchema(mockDb, options);
 
-      expect(querySpy).toHaveBeenCalledWith('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-      expect(querySpy).toHaveBeenCalledWith(NUVEX_SCHEMA_SQL);
-    });    it('should setup cleanup job when requested', async () => {
+      expect(querySpy).toHaveBeenCalledWith(generateNuvexSchemaSQL(undefined, { enableTrigram: true }));
+    });
+
+    it('should setup cleanup job when requested', async () => {
       const querySpy = spyOn(mockDb, 'query');
       // Make the cron job query fail to trigger the error
       querySpy.mockImplementation((...args: unknown[]) => {
@@ -97,8 +102,9 @@ describe('Database Utilities', () => {
         enableCleanupJob: true 
       };
 
-      await setupNuvexSchema(mockDb, options);      expect(querySpy).toHaveBeenCalledWith('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-      expect(querySpy).toHaveBeenCalledWith(NUVEX_SCHEMA_SQL);
+      await setupNuvexSchema(mockDb, options);
+
+      expect(querySpy).toHaveBeenCalledWith(generateNuvexSchemaSQL(undefined, { enableTrigram: true }));
       expect(querySpy).toHaveBeenCalledWith(
         expect.stringContaining('cron.schedule'),
         expect.arrayContaining([expect.stringMatching(/nuvex-cleanup-\d+/)])
